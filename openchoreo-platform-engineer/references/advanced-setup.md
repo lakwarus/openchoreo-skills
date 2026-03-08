@@ -1,5 +1,16 @@
 # Advanced Setup
 
+## Quick navigation
+
+Use this index to jump to the section you need — do not read the whole file.
+
+| Task | Section |
+|------|---------|
+| Replace cert-manager with external CA or Let's Encrypt | [Certificate Management](#certificate-management) |
+| Give builds access to private Git repos | [Private Git Repositories](#private-git-repositories) |
+| Customize build steps, registry, or build plane SA | [Customizing Build Workflows](#customizing-build-workflows) |
+| Configure Keycloak, Cognito, Auth0, Okta, or Azure AD | [Identity Provider Setup](#identity-provider-setup) |
+
 ## Table of Contents
 
 - [Certificate Management](#certificate-management)

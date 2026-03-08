@@ -1,5 +1,26 @@
 # Deploying Applications to OpenChoreo
 
+## Quick navigation
+
+Use this index to jump to the section you need — do not read the whole file.
+
+| Task | Section |
+|------|---------|
+| Deploy a pre-built container image | [Pre-built Image (BYOI)](#pre-built-image-byoi---simplest-path) |
+| Deploy from source / Git | [Building from Source](#building-from-source) |
+| Understand how the CI build produces a Workload | [How the CI Pipeline Works](#how-the-ci-pipeline-works) |
+| Write or fix `workload.yaml` (endpoints, connections) | [Workload Descriptor](#workload-descriptor-workloadyaml) |
+| Scaffold Component YAML from the live cluster | [Using occ component scaffold](#using-occ-component-scaffold) |
+| Deploy to an environment or promote | [Deploying and Promoting](#deploying-and-promoting) |
+| Override config per environment | [ReleaseBinding with Overrides](#releasebinding-with-overrides) |
+| Multi-service app layout | [Multi-Service Applications](#multi-service-applications) |
+| Env vars, secrets, file config | [Environment Variables and Configuration](#environment-variables-and-configuration) |
+| Adapt a local app for OpenChoreo | [Making Local Apps Work on OpenChoreo](#making-local-apps-work-on-openchoreo) |
+| Full deployment checklist | [End-to-End Deployment Checklist](#end-to-end-deployment-checklist) |
+| Debug a stuck or failing deployment | [Debugging Deployments](#debugging-deployments) |
+
+---
+
 ## Pre-built Image (BYOI) - Simplest Path
 
 For apps with existing container images, you need Component + Workload resources.

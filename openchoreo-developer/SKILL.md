@@ -52,7 +52,7 @@ Read only the relevant reference file:
 - `references/mcp-reference.md` for MCP tool usage: mapping developer workflows to MCP tools, tool quick reference, and MCP-specific gotchas — read this when operating through an MCP-connected AI agent instead of the CLI
 - `references/platform-engineer.md` when the task crosses into PE-managed capabilities or needs a clean escalation path
 
-Also prefer repo-backed examples from `samples/from-image/`, `samples/from-source/`, and `samples/getting-started/` before writing a first draft by hand.
+Before writing YAML from scratch, prefer `occ component scaffold` to generate a Component template from the live cluster.
 
 ## Discovery-first workflow
 
@@ -93,6 +93,8 @@ If the component already exists, inspect it before scaffolding or rewriting it.
 Use `occ component scaffold` for Components whenever possible. For existing resources, inspect the current YAML before editing.
 
 If a field path matters, confirm it in the live resource, schema reference, or current docs before patching. This avoids stale assumptions around workflow config, overrides, and app-to-platform boundaries.
+
+Use `occ component scaffold <name> --type <workloadType/typeName>` to generate a valid starting YAML. Pipe with `-o <file>` to save it.
 
 ### 5. Verify with live app evidence
 
