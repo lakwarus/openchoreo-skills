@@ -1,6 +1,7 @@
 # OpenChoreo Skills
 
 This repository contains additional **OpenChoreo Skills** implemented on top of the original skill framework created for OpenChoreo.  
+
 The goal of this repository is to extend the skill set to support more automation scenarios, including Git repository operations, platform workflows, and developer self-service capabilities.
 
 These skills are designed to work with the OpenChoreo MCP / Skills runtime and can be used by AI agents, automation workflows, or developer portal integrations.
