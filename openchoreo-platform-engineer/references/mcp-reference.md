@@ -348,4 +348,8 @@ When connecting to a new cluster, explore infrastructure state in this order:
 
 **Two separate MCP servers**: `mcp__openchoreo-cp__*` targets the control plane API; `mcp__openchoreo-obs__*` targets the Observer API. Both require separate registration. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
 
+**`create_workload` is broken in v0.17 — use the REST API directly**: The MCP tool fails with "resource name may not be empty". Fall back to the control plane REST API. See `openchoreo-developer/references/mcp-reference.md` for the curl pattern.
+
+**`connections` must be an array, not a map**: `get_workload_schema` incorrectly reports connections as a JSON object. The REST API requires an array.
+
 **No observability data after plane registration**: Verify the ObservabilityPlane `status.conditions` with `get_resource(kind="ObservabilityPlane", ...)`. Missing data usually means the agent CA cert is wrong or `observerURL` is unreachable.

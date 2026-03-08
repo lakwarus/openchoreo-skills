@@ -198,6 +198,16 @@ When working with an unfamiliar cluster, always explore in this order:
 
 **Two separate MCP servers**: `mcp__openchoreo-cp__*` talks to the control plane API; `mcp__openchoreo-obs__*` talks to the Observer API. Both must be configured. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
 
+**`create_workload` is broken in v0.17 — use the REST API directly**: The tool fails with "resource name may not be empty". Work around it with a direct POST to the control plane API including `metadata.name` and `spec.owner.projectName`:
+```bash
+curl -X POST "$API_BASE/api/v1/namespaces/default/workloads" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": {"name": "<component>", "namespace": "default"}, "spec": {"owner": {"componentName": "<component>", "projectName": "default"}, "container": {"image": "<image>"}, "endpoints": {...}, "connections": [...]}}'
+```
+
+**`connections` must be an array, not a map**: `get_workload_schema` incorrectly reports connections as a JSON object. The REST API requires an array of connection objects: `[{"component": "...", "endpoint": "...", "visibility": "project", "envBindings": {"address": "ENV_VAR"}}]`.
+
 **Use `query_component_logs` before `get_observer_url`**: For quick log triage in the AI assistant, `query_component_logs` is faster than opening the UI link. Use the URL when you need the full dashboard.
 
 **Observability data requires a live ObservabilityPlane**: If queries return no data, confirm the ObservabilityPlane is registered and healthy — escalate to `openchoreo-platform-engineer` if needed.

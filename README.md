@@ -124,6 +124,18 @@ For **Cursor**, **Windsurf**, or other editors with MCP support, configure the O
 
 ---
 
+## Samples
+
+The `samples/` directory contains end-to-end examples showing how to use these skills with real applications.
+
+| Sample | What it demonstrates |
+|--------|---------------------|
+| [`samples/google-microservice-demo/`](samples/google-microservice-demo/README.md) | Deploy the 12-service GCP Online Boutique onto OpenChoreo using a single prompt — BYOI, gRPC services, connections, external HTTP, worker type |
+
+Each sample includes the exact prompt used, a step-by-step account of what the AI did, results, and any issues discovered.
+
+---
+
 ## Repository structure
 
 ```
@@ -153,6 +165,10 @@ openchoreo-platform-engineer/
     repo-and-context7.md
 
 refresh-openchoreo-mcp.sh   # Legacy script (see official MCP config guide)
+
+samples/
+  google-microservice-demo/
+    README.md               # Prompt, mapping plan, results, known issues
 ```
 
 ---
