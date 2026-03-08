@@ -49,6 +49,7 @@ Read only what the task needs:
 - `references/observability.md` for logs, metrics, traces, alerts, and notification channels
 - `references/troubleshooting.md` for failure isolation, health checks, log locations, and common failure patterns
 - `references/cli-and-resources.md` for PE-relevant `occ` commands and platform resource schemas
+- `references/mcp-reference.md` for MCP tool usage: mapping platform workflows to MCP tools, initial platform setup order, platform resource schemas via MCP, and MCP-specific gotchas — read this when operating through an MCP-connected AI agent instead of the CLI
 - `references/gitops.md` for GitOps repository layout and release flow
 - `references/community-modules.md` for pluggable gateways and observability backends
 - `references/advanced-setup.md` for certificates, private Git, custom build flows, and identity-provider swaps

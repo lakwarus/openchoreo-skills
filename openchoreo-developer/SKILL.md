@@ -49,6 +49,7 @@ Read only the relevant reference file:
 - `references/cli-reference.md` for `occ` install, setup, command behavior, and CLI gotchas
 - `references/deployment-guide.md` for BYOI, source builds, `workload.yaml`, connections, overrides, and deployment flow
 - `references/resource-schemas.md` for exact app-facing YAML shapes
+- `references/mcp-reference.md` for MCP tool usage: mapping developer workflows to MCP tools, tool quick reference, and MCP-specific gotchas — read this when operating through an MCP-connected AI agent instead of the CLI
 - `references/platform-engineer.md` when the task crosses into PE-managed capabilities or needs a clean escalation path
 
 Also prefer repo-backed examples from `samples/from-image/`, `samples/from-source/`, and `samples/getting-started/` before writing a first draft by hand.

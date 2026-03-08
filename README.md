@@ -1,10 +1,8 @@
 # OpenChoreo Skills
 
-This repository contains additional **OpenChoreo Skills** implemented on top of the original skill framework created for OpenChoreo.  
+This repository contains **OpenChoreo Skills** — structured guides and reference documentation that AI agents (such as Claude Code) and automation tools use to operate on the OpenChoreo internal developer platform.
 
-The goal of this repository is to extend the skill set to support more automation scenarios, including Git repository operations, platform workflows, and developer self-service capabilities.
-
-These skills are designed to work with the OpenChoreo MCP / Skills runtime and can be used by AI agents, automation workflows, or developer portal integrations.
+Each skill is a directory with a `SKILL.md` that tells an AI agent how to work in that role, and a `references/` directory with detailed topic files the agent reads on demand.
 
 ---
 
@@ -14,105 +12,184 @@ The original OpenChoreo skills framework was created by **Isala Piyarisi** and i
 
 https://github.com/isala404/openchoreo/tree/occ-skill/docs/skills
 
-This repository builds on top of that work and extends the skill set with additional capabilities while keeping the same skill model and structure.
+This repository builds on that work and extends it with additional reference documentation, MCP tool guides, and platform engineer coverage.
 
 Special thanks to Isala for creating the initial developer skills foundation.
 
 ---
 
-## What this repository adds
+## Skills in this repository
 
-This repo extends the original skills with:
+### `openchoreo-developer`
 
-- Git repository automation skills
-- Additional developer self-service skills
-- Platform workflow skills
-- Extended MCP-compatible skill definitions
-- Examples for building custom skills
+For application-level work: deploying apps, debugging Components and Workloads, writing app-facing YAML, and operating through `occ` or the MCP server.
 
-Current skills include:
+**References included:**
 
-- create-git-repo
-- create-project
-- create-component
-- trigger-workflow
-- list-resources
-- get-logs
-- get-deployment-status
+| File | Contents |
+|------|----------|
+| `concepts.md` | Resource hierarchy, abstractions, cell architecture |
+| `cli-reference.md` | `occ` install, setup, all commands, gotchas |
+| `deployment-guide.md` | BYOI, source builds, `workload.yaml`, connections, promotion |
+| `resource-schemas.md` | Exact YAML shapes for all developer-facing resources |
+| `mcp-reference.md` | MCP tool quick reference, developer workflow → MCP tool mapping |
+| `platform-engineer.md` | PE-managed capabilities and escalation wording |
 
-(more skills will be added over time)
+---
+
+### `openchoreo-platform-engineer`
+
+For platform-level work: cluster setup, Helm, kubectl, planes, ComponentTypes, Traits, Workflows, gateways, secret stores, GitOps, and observability.
+
+**References included:**
+
+| File | Contents |
+|------|----------|
+| `operations.md` | Namespace provisioning, topology, upgrades |
+| `templates-and-workflows.md` | ComponentType, Trait, Workflow, CEL authoring |
+| `integrations.md` | Secret stores, registries, identity, RBAC, webhooks |
+| `observability.md` | Logs, metrics, traces, alerts, notification channels |
+| `troubleshooting.md` | Failure isolation, health checks, common patterns |
+| `cli-and-resources.md` | PE-relevant `occ` commands and platform resource schemas |
+| `mcp-reference.md` | MCP tool quick reference, platform setup → MCP tool mapping |
+| `gitops.md` | GitOps repository layout and release flow |
+| `community-modules.md` | Pluggable gateways and observability backends |
+| `advanced-setup.md` | Certificates, private Git, custom builds, identity-provider swaps |
+| `repo-and-context7.md` | Controller logic, CRD definitions, Helm chart details |
+
+---
+
+## Using with Claude Code
+
+Claude Code supports loading external skill repositories as custom skills. When configured, Claude Code reads the `SKILL.md` files in this repository and uses them to guide its behaviour when working with OpenChoreo.
+
+### Step 1 — Add this repository as a skill source
+
+Add the following to your `~/.claude/settings.json` (or workspace `.claude/settings.json`):
+
+```json
+{
+  "skills": [
+    {
+      "type": "git",
+      "url": "https://github.com/lakmal-gunasekara/openchoreo-skills",
+      "skills": [
+        "openchoreo-developer",
+        "openchoreo-platform-engineer"
+      ]
+    }
+  ]
+}
+```
+
+Alternatively, use the Claude Code CLI to add the skill:
+
+```bash
+claude skill add https://github.com/lakmal-gunasekara/openchoreo-skills
+```
+
+### Step 2 — Configure the OpenChoreo MCP server
+
+The MCP tools referenced in both skills (`mcp__openchoreo-cp__*`) require the OpenChoreo MCP server to be running and registered. Use the `refresh-openchoreo-mcp.sh` script in this repository to configure it:
+
+```bash
+bash refresh-openchoreo-mcp.sh
+```
+
+This script authenticates with the control plane, registers the `openchoreo-cp` MCP server with a fresh bearer token, and optionally adds the `openchoreo-obs` observability server.
+
+To register the MCP server manually, add it to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "openchoreo-cp": {
+      "command": "npx",
+      "args": ["-y", "@openchoreo/mcp-server"],
+      "env": {
+        "OPENCHOREO_CP_URL": "https://<your-control-plane>",
+        "OPENCHOREO_CP_TOKEN": "<bearer-token>"
+      }
+    }
+  }
+}
+```
+
+### Step 3 — Use the skills
+
+Once configured, Claude Code will automatically activate the relevant skill based on your task:
+
+- Tasks about deploying apps, debugging components, or writing YAML → `openchoreo-developer` activates
+- Tasks about cluster setup, plane registration, ComponentTypes, or platform config → `openchoreo-platform-engineer` activates
+- Tasks that cross both boundaries → both skills activate together
+
+**Example prompts:**
+
+```
+Deploy my Node.js app in the current directory to OpenChoreo
+```
+
+```
+Set up a new namespace with a dev and staging environment on OpenChoreo
+```
+
+```
+Debug why my component is stuck in a pending state
+```
+
+```
+Register a new ComponentType for a gRPC service
+```
+
+### Using with other AI tools
+
+Any AI tool or agent that supports the Claude skills / MCP skill model can use this repository. Point the tool at this repository root and load the `SKILL.md` for the relevant role. The `references/` files are loaded on demand by the skill routing rules in each `SKILL.md`.
+
+For **Cursor**, **Windsurf**, or other editors with MCP support, configure the OpenChoreo MCP server as above and reference the `SKILL.md` files directly in your system prompt or context window.
+
+---
+
+## Repository structure
+
+```
+openchoreo-developer/
+  SKILL.md                  # Developer skill guide — loaded by AI agent
+  references/
+    concepts.md
+    cli-reference.md
+    deployment-guide.md
+    resource-schemas.md
+    mcp-reference.md        # MCP tool guide for developers
+    platform-engineer.md
+
+openchoreo-platform-engineer/
+  SKILL.md                  # Platform engineer skill guide — loaded by AI agent
+  references/
+    operations.md
+    templates-and-workflows.md
+    integrations.md
+    observability.md
+    troubleshooting.md
+    cli-and-resources.md
+    mcp-reference.md        # MCP tool guide for platform engineers
+    gitops.md
+    community-modules.md
+    advanced-setup.md
+    repo-and-context7.md
+
+refresh-openchoreo-mcp.sh   # Helper script to configure the MCP server
+```
 
 ---
 
 ## Use cases
 
-These skills can be used for:
-
-- AI agents automating developer workflows
-- Self-service developer portals
-- Platform engineering automation
+- AI agents automating developer workflows on OpenChoreo
+- Self-service developer portals backed by an AI agent
+- Platform engineering automation via MCP
 - CI/CD and GitOps integrations
-- Internal developer platform extensions
-- OpenChoreo MCP integrations
 - Migrating existing Kubernetes workloads into OpenChoreo-managed components
-- Converting existing K8s deployments into skill-driven platform workflows
-- Automating onboarding of legacy services into OpenChoreo
-  
-
----
-
-## Compatibility
-
-These skills are designed for:
-
-- OpenChoreo
-- OpenChoreo MCP server
-- OpenChoreo Skills runtime
-- AI agent integrations (Codex / MCP / LLM agents)
-- Kubernetes-based OpenChoreo deployments
-
----
-
-## Structure
-
-```
-skills/
-  gitrepo/
-  developer/
-  workflow/
-  platform/
-docs/
-examples/
-```
-
-Each skill contains:
-
-- skill.yaml
-- schema.json
-- implementation
-- examples
-
----
-
-## Creating new skills
-
-To create a new skill:
-
-1. Copy an existing skill  
-2. Update `skill.yaml`  
-3. Define input / output schema  
-4. Implement handler  
-5. Register skill in MCP server  
-
-Example:
-
-```
-skills/
-  create-git-repo/
-    skill.yaml
-    schema.json
-    handler.go
-```
+- Onboarding legacy services into OpenChoreo through conversational AI
 
 ---
 
@@ -122,13 +199,12 @@ Contributions are welcome.
 
 You can:
 
-- Add new skills
-- Improve existing skills
-- Fix schemas
+- Add new reference files
+- Improve existing skills or references
 - Add examples
-- Improve documentation
+- Improve the MCP tool guides
 
-Please keep compatibility with the original skill model.
+Please keep the progressive-discovery pattern: `SKILL.md` stays lean and routes to references rather than duplicating content.
 
 ---
 
@@ -140,15 +216,8 @@ Same license as OpenChoreo / original skills unless stated otherwise.
 
 ## Maintainer
 
-Lakmal Warusawithana  
-OpenChoreo / WSO2  
+Lakmal Warusawithana
+OpenChoreo / WSO2
 
-Extending original skills created by  
+Extending original skills created by
 Isala Piyarisi
-
----
-
-## Repository Description (short)
-
-Extended OpenChoreo skills including GitRepo, workflow, and developer automation skills.  
-Based on original skills by Isala Piyarisi.
