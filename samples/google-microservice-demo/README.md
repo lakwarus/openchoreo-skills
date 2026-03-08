@@ -278,15 +278,11 @@ Redis: `redis:alpine`
 
 ## Screenshots
 
-> Add your own screenshots to the `screenshots/` subfolder and update the links below.
-> Suggested filename convention: `<number>-<description>.png` (e.g. `01-cell-diagram.png`).
-
 ### Cell diagram — auto-generated service topology
 
 OpenChoreo automatically generates a cell diagram showing all 12 components and their connection graph. This is visible in the project view after all components are deployed.
 
-<!-- Replace the path below with your screenshot -->
-<!-- ![Cell diagram](screenshots/01-cell-diagram.png) -->
+![Cell diagram](screenshots/01-cell-diagram.png)
 
 > **To capture:** Open the OpenChoreo console → select the `default` project → the topology/cell view renders the full graph automatically from the declared `connections`.
 
@@ -296,7 +292,7 @@ OpenChoreo automatically generates a cell diagram showing all 12 components and 
 
 The components view shows every deployed service with its type, status, and latest release hash.
 
-<!-- ![Component list](screenshots/02-component-list.png) -->
+![Component list](screenshots/02-component-list.png)
 
 > **To capture:** OpenChoreo console → Components tab → filter by project `default`.
 
@@ -306,7 +302,7 @@ The components view shows every deployed service with its type, status, and late
 
 The ReleaseBinding detail for `cartservice` shows the `redis-cart` connection resolved and the `REDIS_ADDR` env var injected by the platform.
 
-<!-- ![Cart Service ReleaseBinding](screenshots/03-cartservice-releasebinding.png) -->
+![Cart Service ReleaseBinding](screenshots/03-cartservice-releasebinding.png)
 
 > **To capture:** OpenChoreo console → Components → `cartservice` → Deployments → `development` binding.
 
@@ -316,7 +312,7 @@ The ReleaseBinding detail for `cartservice` shows the `redis-cart` connection re
 
 If the `openchoreo-obs` MCP server is configured and an ObservabilityPlane is registered, the observer UI shows per-component logs, HTTP metrics, and traces.
 
-<!-- ![Observability dashboard](screenshots/04-observability.png) -->
+![Observability dashboard](screenshots/04-observability.png)
 
 > **To capture:** OpenChoreo console → Components → `frontend` → Observability tab.
 
