@@ -72,7 +72,7 @@ Add the following to your `~/.claude/settings.json` (or workspace `.claude/setti
   "skills": [
     {
       "type": "git",
-      "url": "https://github.com/lakmal-gunasekara/openchoreo-skills",
+      "url": "https://github.com/lakwarus/openchoreo-skills",
       "skills": [
         "openchoreo-developer",
         "openchoreo-platform-engineer"
