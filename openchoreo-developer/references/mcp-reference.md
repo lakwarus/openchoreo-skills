@@ -1,6 +1,6 @@
 # OpenChoreo MCP Reference — Developer
 
-This document maps developer workflows to the `mcp__openchoreo-cp__*` MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
+This document maps developer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
 ## Tool Quick Reference
 
@@ -57,6 +57,20 @@ This document maps developer workflows to the `mcp__openchoreo-cp__*` MCP tools 
 | `get_resource` | `occ <resource> get <name>` | Get any resource by kind and name |
 | `delete_resource` | `occ <resource> delete <name>` | Delete any resource |
 | `explain_schema` | — | Explain schema for any resource kind |
+
+## Observability Tool Quick Reference
+
+These tools use the `mcp__openchoreo-obs__*` server and are the primary way to query logs, metrics, and traces from an AI assistant.
+
+| MCP Tool | Purpose |
+|----------|---------|
+| `query_component_logs` | Query runtime logs for a component in a given environment |
+| `query_workflow_logs` | Query build / workflow run logs |
+| `query_http_metrics` | Query HTTP request rate, latency, and error metrics |
+| `query_resource_metrics` | Query CPU and memory usage for a component |
+| `query_traces` | Search distributed traces for a component |
+| `query_trace_spans` | List spans within a trace |
+| `get_span_details` | Get full detail for a single span |
 
 ## Key Workflows
 
@@ -115,8 +129,27 @@ get_component(namespace, project, component)   → spec + status conditions
 get_component_workloads(namespace, project, component) → running workloads
 list_release_bindings(namespace, project, component)   → binding per environment
 get_environment_release(namespace, environment)        → what release is live
-get_component_observer_url(namespace, project, component) → observability link
+get_observer_url(namespace, project, component)        → observability UI link
 list_secret_references(namespace)                      → available secrets
+```
+
+### 6. Query Logs and Metrics (Observability MCP)
+
+Use `mcp__openchoreo-obs__*` tools to query telemetry without leaving the AI assistant:
+
+```
+query_component_logs(namespace, project, component, environment)  → runtime logs
+query_workflow_logs(namespace, project, component, workflow_run)  → build logs
+query_http_metrics(namespace, project, component, environment)    → request rate / latency / errors
+query_resource_metrics(namespace, project, component, environment) → CPU and memory
+```
+
+Trace debugging flow:
+
+```
+query_traces(namespace, project, component, environment)  → find relevant traces
+query_trace_spans(trace_id)                               → list spans in a trace
+get_span_details(span_id)                                 → inspect a single span
 ```
 
 ### 6. Create a Workload Directly
@@ -162,3 +195,9 @@ When working with an unfamiliar cluster, always explore in this order:
 **`explain_schema` is your scaffold tool**: When you need to write resource YAML, call `explain_schema(kind="Component", path="spec")` to explore available fields rather than guessing.
 
 **Workflow runs can lag**: A just-triggered workflow may briefly show no runs. Call `list_component_workflow_runs` after a moment, then verify with `get_component`.
+
+**Two separate MCP servers**: `mcp__openchoreo-cp__*` talks to the control plane API; `mcp__openchoreo-obs__*` talks to the Observer API. Both must be configured. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
+
+**Use `query_component_logs` before `get_observer_url`**: For quick log triage in the AI assistant, `query_component_logs` is faster than opening the UI link. Use the URL when you need the full dashboard.
+
+**Observability data requires a live ObservabilityPlane**: If queries return no data, confirm the ObservabilityPlane is registered and healthy — escalate to `openchoreo-platform-engineer` if needed.

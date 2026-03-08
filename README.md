@@ -1,5 +1,8 @@
 # OpenChoreo Skills
 
+> **Supported OpenChoreo version: 0.17**
+> The skills, reference files, and MCP tool mappings in this repository are verified against OpenChoreo **v0.17**. Behaviour may differ on earlier or later versions.
+
 This repository contains **OpenChoreo Skills** — structured guides and reference documentation that AI agents (such as Claude Code) and automation tools use to operate on the OpenChoreo internal developer platform.
 
 Each skill is a directory with a `SKILL.md` that tells an AI agent how to work in that role, and a `references/` directory with detailed topic files the agent reads on demand.
@@ -76,13 +79,16 @@ npx skills add https://github.com/lakwarus/openchoreo-skills/blob/main/README.md
 
 ### Step 2 — Configure the OpenChoreo MCP server
 
-The MCP tools referenced in both skills (`mcp__openchoreo-cp__*`) require the OpenChoreo MCP server to be running and registered.
+Both skills use two MCP servers:
 
-Follow the official configuration guide:
+| Server | Tool prefix | Purpose |
+|--------|------------|---------|
+| `openchoreo-cp` | `mcp__openchoreo-cp__*` | Control plane — manage components, deployments, environments |
+| `openchoreo-obs` | `mcp__openchoreo-obs__*` | Observer API — query logs, metrics, and traces |
+
+Follow the official configuration guide to register both:
 
 **https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/**
-
-The guide covers authentication, registering the `openchoreo-cp` MCP server, and optional observability server setup.
 
 ### Step 3 — Use the skills
 

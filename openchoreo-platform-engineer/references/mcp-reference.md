@@ -1,6 +1,6 @@
 # OpenChoreo MCP Reference — Platform Engineer
 
-This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
+This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
 ## Tool Quick Reference
 
@@ -46,6 +46,20 @@ This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` MC
 | `explain_schema` | — | Explain schema for any resource kind |
 | `get_environment_release` | — | Check what release is deployed in an env |
 | `list_release_bindings` | `occ releasebinding list` | List component release bindings |
+
+## Observability Tool Quick Reference
+
+These tools use the `mcp__openchoreo-obs__*` server. Platform engineers use them to validate that the observability stack is collecting data correctly and to help investigate component-level issues raised by developers.
+
+| MCP Tool | Purpose |
+|----------|---------|
+| `query_component_logs` | Query runtime logs for a component in a given environment |
+| `query_workflow_logs` | Query build / workflow run logs |
+| `query_http_metrics` | Query HTTP request rate, latency, and error metrics |
+| `query_resource_metrics` | Query CPU and memory usage for a component |
+| `query_traces` | Search distributed traces for a component |
+| `query_trace_spans` | List spans within a trace |
+| `get_span_details` | Get full detail for a single span |
 
 ## Resource Schemas
 
@@ -280,7 +294,20 @@ list_release_bindings(namespace, project, component) → binding per environment
 list_secret_references(namespace)           → available secrets
 ```
 
-### 7. Generic Resource Operations
+### 7. Validate Observability Stack (Observability MCP)
+
+After registering an ObservabilityPlane, confirm data is flowing end-to-end:
+
+```
+query_resource_metrics(namespace, project, component, environment) → CPU/memory arriving?
+query_component_logs(namespace, project, component, environment)   → logs arriving?
+query_http_metrics(namespace, project, component, environment)     → HTTP metrics arriving?
+query_traces(namespace, project, component, environment)           → traces arriving?
+```
+
+If any query returns no data, check the ObservabilityPlane agent connectivity and Helm configuration for that signal type.
+
+### 8. Generic Resource Operations
 
 ```
 apply_resource(yaml_content)               → create or update any resource
@@ -318,3 +345,7 @@ When connecting to a new cluster, explore infrastructure state in this order:
 **Status conditions are your debug tool**: `get_dataplane`, `get_environment`, `get_component` all return `status.conditions`. Check `reason` and `message` fields for any resource that isn't `Ready`.
 
 **`get_resource` is a fallback**: For resource kinds not covered by a dedicated MCP tool, use `get_resource(kind, name, namespace)` to retrieve full YAML.
+
+**Two separate MCP servers**: `mcp__openchoreo-cp__*` targets the control plane API; `mcp__openchoreo-obs__*` targets the Observer API. Both require separate registration. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
+
+**No observability data after plane registration**: Verify the ObservabilityPlane `status.conditions` with `get_resource(kind="ObservabilityPlane", ...)`. Missing data usually means the agent CA cert is wrong or `observerURL` is unreachable.
