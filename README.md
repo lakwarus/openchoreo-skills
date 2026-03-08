@@ -65,28 +65,14 @@ Claude Code supports loading external skill repositories as custom skills. When 
 
 ### Step 1 — Add this repository as a skill source
 
-Add the following to your `~/.claude/settings.json` (or workspace `.claude/settings.json`):
-
-```json
-{
-  "skills": [
-    {
-      "type": "git",
-      "url": "https://github.com/lakwarus/openchoreo-skills",
-      "skills": [
-        "openchoreo-developer",
-        "openchoreo-platform-engineer"
-      ]
-    }
-  ]
-}
-```
-
-Alternatively, use the Claude Code CLI to add the skill:
+Run the following command to install both skills globally:
 
 ```bash
-claude skill add https://github.com/lakwarus/openchoreo-skills
+npx skills add https://github.com/lakwarus/openchoreo-skills/blob/main/README.md -g -y
 ```
+
+- `-g` installs globally (available in all projects)
+- `-y` skips confirmation prompts
 
 ### Step 2 — Configure the OpenChoreo MCP server
 
