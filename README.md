@@ -85,7 +85,7 @@ Add the following to your `~/.claude/settings.json` (or workspace `.claude/setti
 Alternatively, use the Claude Code CLI to add the skill:
 
 ```bash
-claude skill add https://github.com/lakmal-gunasekara/openchoreo-skills
+claude skill add https://github.com/lakwarus/openchoreo-skills
 ```
 
 ### Step 2 — Configure the OpenChoreo MCP server
