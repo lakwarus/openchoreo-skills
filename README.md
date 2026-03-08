@@ -90,30 +90,13 @@ claude skill add https://github.com/lakwarus/openchoreo-skills
 
 ### Step 2 — Configure the OpenChoreo MCP server
 
-The MCP tools referenced in both skills (`mcp__openchoreo-cp__*`) require the OpenChoreo MCP server to be running and registered. Use the `refresh-openchoreo-mcp.sh` script in this repository to configure it:
+The MCP tools referenced in both skills (`mcp__openchoreo-cp__*`) require the OpenChoreo MCP server to be running and registered.
 
-```bash
-bash refresh-openchoreo-mcp.sh
-```
+Follow the official configuration guide:
 
-This script authenticates with the control plane, registers the `openchoreo-cp` MCP server with a fresh bearer token, and optionally adds the `openchoreo-obs` observability server.
+**https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/**
 
-To register the MCP server manually, add it to your Claude Code MCP config:
-
-```json
-{
-  "mcpServers": {
-    "openchoreo-cp": {
-      "command": "npx",
-      "args": ["-y", "@openchoreo/mcp-server"],
-      "env": {
-        "OPENCHOREO_CP_URL": "https://<your-control-plane>",
-        "OPENCHOREO_CP_TOKEN": "<bearer-token>"
-      }
-    }
-  }
-}
-```
+The guide covers authentication, registering the `openchoreo-cp` MCP server, and optional observability server setup.
 
 ### Step 3 — Use the skills
 
@@ -177,7 +160,7 @@ openchoreo-platform-engineer/
     advanced-setup.md
     repo-and-context7.md
 
-refresh-openchoreo-mcp.sh   # Helper script to configure the MCP server
+refresh-openchoreo-mcp.sh   # Legacy script (see official MCP config guide)
 ```
 
 ---
