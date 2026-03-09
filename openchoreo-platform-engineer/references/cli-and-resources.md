@@ -35,9 +35,6 @@ Check latest release at: https://github.com/openchoreo/openchoreo/releases/lates
 ```bash
 # Local setup
 /tmp/occ config controlplane update default --url http://api.openchoreo.localhost:8080
-
-# AWS POC setup (if needed)
-/tmp/occ config controlplane update default --url https://api.aws.openchoreo-poc.choreo.dev
 ```
 
 ### Authentication
