@@ -1,7 +1,7 @@
 ---
 name: openchoreo-platform-engineer
 description: |
-  Use this whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, kubectl work, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. If the same task also involves deploying or debugging an application through `occ`, activate `openchoreo-developer` too instead of waiting to escalate later.
+  Use this whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. Prefer MCP tools and the REST API over kubectl; use occ for resource management. If the same task also involves deploying or debugging an application through `occ`, activate `openchoreo-developer` too instead of waiting to escalate later.
 ---
 
 # OpenChoreo Platform Engineer Guide
@@ -13,7 +13,7 @@ Help with OpenChoreo platform-level work. Keep this file generic and pull specif
 Use this skill for PE-owned work:
 
 - Cluster-side setup, upgrades, and troubleshooting
-- `kubectl`, Helm, CRD, controller, or agent investigation
+- Helm, CRD, controller, or agent investigation
 - Platform resources such as DataPlane, BuildPlane, ObservabilityPlane, Environment, DeploymentPipeline, Project, ComponentType, Trait, and Workflow
 - Shared platform capabilities such as gateways, secret stores, registries, identity, RBAC, and observability
 
@@ -30,10 +30,14 @@ If both skills are available and the task touches both app behavior and platform
 Prefer progressive discovery over memorized specifics:
 
 1. Identify the exact plane, namespace, resource, or failure domain.
-2. Inspect live state first with `kubectl`, `occ`, Helm, and current resource YAML.
+2. Inspect live state first using MCP tools, then `occ`, then the REST API. Use `kubectl` only when MCP and occ cannot reach the resource (e.g. plane-level CRDs, controller logs).
 3. Read only the reference file that matches the task.
 4. Make the smallest change that can prove or fix the issue.
 5. Verify the result from the live cluster before moving on.
+
+**Tool preference order: MCP tools → occ / REST API → kubectl (last resort)**
+
+Read `references/cli-and-resources.md` for occ installation, authentication, and the REST API fallback patterns before reaching for kubectl.
 
 Treat the live cluster and current repo as the source of truth. If a remembered field name, example, or behavior conflicts with current output, trust the current output and then confirm in the relevant reference file or repository source.
 
@@ -115,12 +119,15 @@ If the platform change succeeded but the app still fails, hand off to or continu
 
 Keep these in mind because they are durable and high-value:
 
-- Platform work usually requires `kubectl` and often Helm; developer work usually centers on `occ`
-- Upgrade order matters; do not move a remote plane ahead of the control plane
-- Scope matters; cluster-scoped and namespace-scoped resources are not interchangeable
-- `status.conditions`, live resource YAML, and current controller logs are better truth sources than memory
-- When a task needs exact controller behavior or CRD fields, inspect the repo or Context7 instead of guessing
-- Prefer reversible, inspectable changes over broad edits across many planes or namespaces
+- **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
+- `create_environment` and `create_deployment_pipeline` are not MCP tools — use the REST API with a bearer token. See `references/cli-and-resources.md`.
+- `occ` is not installed by default — download from GitHub releases. `occ login` with `service_mcp_client` does not work; get a bearer token via curl instead.
+- `create_project` via MCP defaults to `deploymentPipelineRef: default` — use a REST API PUT to reassign.
+- Upgrade order matters; do not move a remote plane ahead of the control plane.
+- Scope matters; cluster-scoped and namespace-scoped resources are not interchangeable.
+- `status.conditions`, live resource YAML, and current controller logs are better truth sources than memory.
+- When a task needs exact controller behavior or CRD fields, inspect the repo or Context7 instead of guessing.
+- Prefer reversible, inspectable changes over broad edits across many planes or namespaces.
 
 ## Anti-patterns
 

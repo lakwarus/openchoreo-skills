@@ -2,7 +2,11 @@
 
 This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
-> **Note on platform resource management**: DataPlane, BuildPlane, and ObservabilityPlane CRUD operations are not exposed as MCP tools. Use `kubectl` or `occ apply` for those resources. MCP tools cover namespace, project, environment, component type, trait, and workflow management, as well as tenant inspection.
+> **Note on platform resource management**: The following operations are **not available as MCP tools** — use the REST API directly (see `cli-and-resources.md` → REST API Fallback section):
+> - `create_environment` / `create_deployment_pipeline`
+> - DataPlane, BuildPlane, ObservabilityPlane CRUD
+>
+> Projects created via `create_project` MCP default to `deploymentPipelineRef: default`. Use a REST API PUT to reassign the pipeline after creation.
 
 ## Tool Quick Reference
 
@@ -227,23 +231,47 @@ spec:
 
 ### 1. Initial Platform Setup
 
-Plane and environment resources must be created via `kubectl apply` or `occ apply` — there are no MCP tools for DataPlane/BuildPlane/ObservabilityPlane creation:
+Environments and DeploymentPipelines have no MCP create tools — use the REST API (see `cli-and-resources.md` → REST API Fallback). Plane resources (DataPlane, BuildPlane, ObservabilityPlane) require `kubectl apply`.
 
 ```bash
-# Via kubectl or occ apply:
-kubectl apply -f namespace.yaml
-kubectl apply -f clusterdataplane.yaml
-kubectl apply -f environment.yaml
-kubectl apply -f deploymentpipeline.yaml
+# Step 1 — get a token (local setup)
+MCP_TOKEN=$(curl -s -X POST "http://thunder.openchoreo.localhost:8080/oauth2/token" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -u 'service_mcp_client:service_mcp_client_secret' \
+  -d 'grant_type=client_credentials' | jq -r '.access_token')
+
+# Step 2 — create environments via REST API
+curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/environments" \
+  -H "Authorization: Bearer $MCP_TOKEN" -H "Content-Type: application/json" \
+  -d '{"metadata":{"name":"development","namespace":"default","labels":{"openchoreo.dev/name":"development"}},"spec":{"dataPlaneRef":{"kind":"DataPlane","name":"default"},"isProduction":false}}'
+
+# Step 3 — create deployment pipeline via REST API
+curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/deploymentpipelines" \
+  -H "Authorization: Bearer $MCP_TOKEN" -H "Content-Type: application/json" \
+  -d '{"metadata":{"name":"my-pipeline","namespace":"default"},"spec":{"promotionPaths":[...]}}'
 ```
 
-Then use MCP to create a project and confirm setup:
+Then use MCP to create a project and assign the pipeline:
 
 ```
-create_namespace(name)
-create_project(namespace, name, pipeline_ref)
+create_namespace(name)                 → via MCP
+create_project(namespace, name)        → via MCP (defaults to "default" pipeline)
+```
+
+Then reassign the pipeline via REST PUT (create_project ignores pipeline ref):
+
+```bash
+curl -s -X PUT "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/projects/<name>" \
+  -H "Authorization: Bearer $MCP_TOKEN" -H "Content-Type: application/json" \
+  -d '{"metadata":{"name":"<name>","namespace":"default"},"spec":{"deploymentPipelineRef":"<pipeline>"}}'
+```
+
+Verify with MCP:
+
+```
 list_environments(namespace)            → confirm environments visible
 list_deployment_pipelines(namespace)    → confirm pipeline visible
+list_projects(namespace)                → confirm pipeline assignments
 ```
 
 ### 2. Inspect Platform Infrastructure
@@ -258,12 +286,15 @@ list_cluster_traits(namespace)               → what traits are registered?
 list_workflows(namespace)                    → what build workflows exist?
 ```
 
-For plane status (DataPlane, BuildPlane, ObservabilityPlane), inspect directly with kubectl:
+For plane status (DataPlane, BuildPlane, ObservabilityPlane), use the REST API since there are no MCP tools for these:
 
 ```bash
-kubectl get dataplane -n <namespace>
-kubectl get clusterdataplane
-kubectl describe dataplane default -n <namespace>
+# Get all dataplanes
+curl -s -H "Authorization: Bearer $MCP_TOKEN" \
+  "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/dataplanes"
+
+# If the REST API doesn't expose planes, kubectl is the fallback
+kubectl get clusterdataplane,clusterbuildplane,clusterobservabilityplane -A
 ```
 
 ### 3. Register Component Types
@@ -276,11 +307,7 @@ get_cluster_component_type(namespace, name)        → inspect one type
 get_cluster_component_type_schema(namespace, name) → see full schema with templates
 ```
 
-Register new types via `occ apply` or `kubectl apply`:
-
-```bash
-kubectl apply -f clustercomponenttype.yaml
-```
+Register new types via `occ apply` (preferred) or the REST API:
 
 ### 4. Register Traits
 
@@ -301,11 +328,7 @@ list_workflows(namespace)              → what workflows exist?
 get_workflow_schema(namespace, name)   → inspect a workflow template
 ```
 
-Register new workflows via `occ apply` or `kubectl apply`:
-
-```bash
-kubectl apply -f workflow.yaml
-```
+Register new workflows via `occ apply` (preferred) or the REST API.
 
 ### 6. Inspect Tenant Usage
 
@@ -349,15 +372,25 @@ When connecting to a new cluster, explore infrastructure state in this order:
 7. list_projects(namespace)
 ```
 
-For plane connectivity, use kubectl:
+For plane resources not exposed by MCP, try the REST API first:
 
 ```bash
-kubectl get clusterdataplane,clusterbuildplane,clusterobservabilityplane -A
+MCP_TOKEN=$(curl -s -X POST "http://thunder.openchoreo.localhost:8080/oauth2/token" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -u 'service_mcp_client:service_mcp_client_secret' \
+  -d 'grant_type=client_credentials' | jq -r '.access_token')
+
+curl -s -H "Authorization: Bearer $MCP_TOKEN" \
+  "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/dataplanes"
 ```
+
+Fall back to `kubectl` only if the REST API does not expose the resource.
 
 ## Common Gotchas
 
-**DataPlane/BuildPlane/ObservabilityPlane CRUD requires kubectl or occ apply**: There are no MCP tools for managing plane resources. Use `kubectl apply`, `occ apply`, or Helm values.
+**`create_environment` and `create_deployment_pipeline` are not MCP tools**: Use the REST API directly. See `cli-and-resources.md` → REST API Fallback for exact curl patterns and auth setup.
+
+**DataPlane/BuildPlane/ObservabilityPlane CRUD is not exposed via MCP or REST API**: Use `occ apply -f <file>` if occ is available, otherwise `kubectl apply`. Helm values control plane registration at install time.
 
 **`deploymentPipelineRef` is a plain string**: In Project YAML, use `deploymentPipelineRef: default`, not an object with `kind`/`name`.
 

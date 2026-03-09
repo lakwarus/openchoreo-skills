@@ -111,7 +111,7 @@ Trust deployed URLs and endpoint details from ReleaseBinding status instead of c
 
 Keep these because they are durable and routinely useful:
 
-- Default to `occ`; if the task needs `kubectl`, that is usually a PE boundary or a mixed-skill task
+- Default to MCP tools first, then `occ`; avoid `kubectl` — if the task genuinely needs it, that is a PE boundary or a mixed-skill task
 - `occ <resource> get <name>` returns full YAML and is a primary debugging tool
 - Prefer scaffolding and samples over hand-written first drafts
 - Source-build Components use `spec.workflow`; `workload.yaml` belongs at the root of the selected `appPath`

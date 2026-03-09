@@ -1,5 +1,150 @@
 # CLI and Resources
 
+<!-- Quick navigation
+- [occ Installation](#occ-installation)
+- [Setup and Authentication](#setup-and-authentication)
+- [REST API Fallback](#rest-api-fallback-when-mcp-tools-are-missing)
+- [PE-Relevant occ Commands](#pe-relevant-occ-commands)
+- [Resource Schemas](#resource-schemas)
+-->
+
+## occ Installation
+
+`occ` is the OpenChoreo CLI. It is **not installed by default** — download from GitHub releases:
+
+```bash
+# macOS ARM64 (Apple Silicon)
+curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz" -o /tmp/occ.tar.gz
+tar -xzf /tmp/occ.tar.gz -C /tmp
+chmod +x /tmp/occ
+/tmp/occ version   # verify
+
+# macOS AMD64 (Intel)
+curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz" -o /tmp/occ.tar.gz
+tar -xzf /tmp/occ.tar.gz -C /tmp && chmod +x /tmp/occ
+```
+
+Check latest release at: https://github.com/openchoreo/openchoreo/releases/latest
+
+**Note**: The `choreo` binary at `~/.choreo/bin/choreo` is the WSO2 commercial Choreo cloud CLI — it is a different product and cannot manage OpenChoreo resources.
+
+## Setup and Authentication
+
+### Point occ at the control plane
+
+```bash
+# Local setup
+/tmp/occ config controlplane update default --url http://api.openchoreo.localhost:8080
+
+# AWS POC setup (if needed)
+/tmp/occ config controlplane update default --url https://api.aws.openchoreo-poc.choreo.dev
+```
+
+### Authentication
+
+**occ login with `service_mcp_client` does NOT work** — this client is not configured for the occ OIDC flow. The error will be `unauthorized_client: Client is not allowed to use the specified token endpoint authentication method`.
+
+Instead, get a bearer token via curl and use the REST API directly (see below).
+
+```bash
+# Local setup — get a token
+MCP_TOKEN=$(curl -s -X POST "http://thunder.openchoreo.localhost:8080/oauth2/token" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -u 'service_mcp_client:service_mcp_client_secret' \
+  -d 'grant_type=client_credentials' | jq -r '.access_token')
+
+# Verify the API is reachable
+curl -s -H "Authorization: Bearer $MCP_TOKEN" \
+  "http://api.openchoreo.localhost:8080/api/v1/namespaces"
+```
+
+The token and identity server URLs are in `local-refresh-openchoreo-mcp.sh` at the repo root.
+
+## REST API Fallback (when MCP tools are missing)
+
+The MCP server does **not** expose `create_environment` or `create_deployment_pipeline`. Use the REST API directly.
+
+### API base pattern
+
+```
+http://api.openchoreo.localhost:8080/api/v1/namespaces/{namespace}/{resource}
+```
+
+### Create an Environment
+
+```bash
+curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/environments" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "name": "qa",
+      "namespace": "default",
+      "labels": {"openchoreo.dev/name": "qa"},
+      "annotations": {
+        "openchoreo.dev/display-name": "QA",
+        "openchoreo.dev/description": "QA"
+      }
+    },
+    "spec": {
+      "dataPlaneRef": {"kind": "DataPlane", "name": "default"},
+      "isProduction": false
+    }
+  }'
+```
+
+Set `"isProduction": true` for production environments.
+
+### Create a DeploymentPipeline
+
+```bash
+curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/deploymentpipelines" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "name": "my-pipeline",
+      "namespace": "default",
+      "labels": {"openchoreo.dev/name": "my-pipeline"},
+      "annotations": {
+        "openchoreo.dev/display-name": "My Pipeline",
+        "openchoreo.dev/description": "dev → staging → production"
+      }
+    },
+    "spec": {
+      "promotionPaths": [
+        {"sourceEnvironmentRef": "development", "targetEnvironmentRefs": [{"name": "staging", "requiresApproval": false}]},
+        {"sourceEnvironmentRef": "staging", "targetEnvironmentRefs": [{"name": "production", "requiresApproval": false}]}
+      ]
+    }
+  }'
+```
+
+### Update a Project's pipeline assignment
+
+Projects are created via MCP (`create_project`) but default to `deploymentPipelineRef: default`. Use PUT to reassign:
+
+```bash
+curl -s -X PUT "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/projects/foo" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"metadata":{"name":"foo","namespace":"default"},"spec":{"deploymentPipelineRef":"foo-pipeline"}}'
+```
+
+**Use PUT, not PATCH** — PATCH returns an empty response on this API.
+
+### Other useful REST endpoints
+
+```bash
+# List any resource
+curl -s -H "Authorization: Bearer $MCP_TOKEN" \
+  "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/{resource}"
+
+# Get a specific resource
+curl -s -H "Authorization: Bearer $MCP_TOKEN" \
+  "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/{resource}/{name}"
+```
+
 ## PE-Relevant occ Commands
 
 PEs use both `occ` and `kubectl`. Use `occ` for OpenChoreo abstractions, `kubectl` for cluster-level operations and debugging.
