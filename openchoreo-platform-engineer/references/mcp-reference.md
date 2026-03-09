@@ -2,26 +2,19 @@
 
 This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
+> **Note on platform resource management**: DataPlane, BuildPlane, and ObservabilityPlane CRUD operations are not exposed as MCP tools. Use `kubectl` or `occ apply` for those resources. MCP tools cover namespace, project, environment, component type, trait, and workflow management, as well as tenant inspection.
+
 ## Tool Quick Reference
 
 | MCP Tool | CLI Equivalent | Purpose |
 |----------|---------------|---------|
 | `list_namespaces` | `occ namespace list` | List namespaces |
-| `get_namespace` | `occ namespace get <name>` | Get namespace details |
 | `create_namespace` | `occ apply -f namespace.yaml` | Create a namespace |
-| `list_dataplanes` | `occ dataplane list` | List namespace-scoped DataPlanes |
-| `get_dataplane` | `occ dataplane get <name>` | Get DataPlane details |
-| `create_dataplane` | `occ apply -f dataplane.yaml` | Create a DataPlane |
-| `list_cluster_dataplanes` | `occ dataplane list` (cluster scope) | List cluster-scoped DataPlanes |
-| `get_cluster_dataplane` | `occ dataplane get <name>` (cluster scope) | Get ClusterDataPlane details |
-| `create_cluster_dataplane` | `occ apply -f clusterdataplane.yaml` | Create a ClusterDataPlane |
-| `list_cluster_buildplanes` | `occ buildplane list` | List BuildPlanes |
-| `list_observability_planes` | `occ observabilityplane list` | List namespace-scoped ObservabilityPlanes |
-| `list_cluster_observability_planes` | `occ observabilityplane list` (cluster) | List cluster-scoped ObservabilityPlanes |
 | `list_environments` | `occ environment list` | List environments |
 | `get_environment` | `occ environment get <name>` | Get environment details |
-| `create_environment` | `occ apply -f environment.yaml` | Create an environment |
-| `get_deployment_pipeline` | `occ deploymentpipeline get <name>` | Get deployment pipeline |
+| `get_environment_release` | — | Check what release is deployed in an env |
+| `list_deployment_pipelines` | `occ deploymentpipeline list` | List deployment pipelines |
+| `get_deployment_pipeline` | `occ deploymentpipeline get <name>` | Get deployment pipeline details |
 | `list_component_types` | `occ componenttype list` | List namespace-scoped component types |
 | `get_component_type_schema` | `occ componenttype get <name>` | Get component type schema |
 | `list_cluster_component_types` | `occ clustercomponenttype list` | List cluster-scoped component types |
@@ -35,17 +28,23 @@ This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (c
 | `list_workflows` | `occ workflow list` | List build workflow templates |
 | `get_workflow_schema` | `occ workflow get <name>` | Get workflow template schema |
 | `list_projects` | `occ project list` | List projects |
-| `get_project` | `occ project get <name>` | Get project details |
 | `create_project` | `occ apply -f project.yaml` | Create a project |
 | `list_components` | `occ component list` | List components (for inspection) |
 | `get_component` | `occ component get <name>` | Get component spec and status |
-| `list_secret_references` | `occ secretreference list` | List secret references |
-| `apply_resource` | `occ apply -f <file>` | Create/update any resource from YAML |
-| `get_resource` | `occ <resource> get <name>` | Get any resource YAML |
-| `delete_resource` | `occ <resource> delete <name>` | Delete any resource |
-| `explain_schema` | — | Explain schema for any resource kind |
-| `get_environment_release` | — | Check what release is deployed in an env |
+| `patch_component` | `occ apply -f component.yaml` (update) | Patch a component |
+| `list_workloads` | `occ workload list` | List workloads for a component |
+| `get_workload` | `occ workload get <name>` | Get workload details |
+| `get_workload_schema` | — | Get workload YAML schema |
+| `list_workflow_runs` | `occ component workflowrun list` | List workflow runs |
+| `get_workflow_run` | `occ component workflowrun get <name>` | Get a specific workflow run |
+| `list_component_releases` | `occ componentrelease list` | List component releases |
+| `get_component_release` | `occ componentrelease get <name>` | Get release details |
 | `list_release_bindings` | `occ releasebinding list` | List component release bindings |
+| `get_release_binding` | `occ releasebinding get <name>` | Get a specific release binding |
+| `patch_release_binding` | `occ apply -f releasebinding.yaml` (update) | Patch a release binding |
+| `update_release_binding_state` | — | Activate or deactivate a release binding |
+| `list_secret_references` | `occ secretreference list` | List secret references |
+| `get_observer_url` | — | Get observability URL for a component |
 
 ## Observability Tool Quick Reference
 
@@ -62,6 +61,8 @@ These tools use the `mcp__openchoreo-obs__*` server. Platform engineers use them
 | `get_span_details` | Get full detail for a single span |
 
 ## Resource Schemas
+
+These YAML shapes are used with `kubectl apply` or `occ apply` — there are no dedicated MCP CRUD tools for plane resources.
 
 ### Namespace
 
@@ -226,26 +227,43 @@ spec:
 
 ### 1. Initial Platform Setup
 
-Set up namespace, planes, environments, and pipelines in order:
+Plane and environment resources must be created via `kubectl apply` or `occ apply` — there are no MCP tools for DataPlane/BuildPlane/ObservabilityPlane creation:
+
+```bash
+# Via kubectl or occ apply:
+kubectl apply -f namespace.yaml
+kubectl apply -f clusterdataplane.yaml
+kubectl apply -f environment.yaml
+kubectl apply -f deploymentpipeline.yaml
+```
+
+Then use MCP to create a project and confirm setup:
 
 ```
 create_namespace(name)
-create_cluster_dataplane(name, spec_yaml)    → or create_dataplane for ns-scoped
-create_environment(namespace, name, dataplane_ref, is_production)
-apply_resource(deployment_pipeline_yaml)     → define promotion paths
 create_project(namespace, name, pipeline_ref)
+list_environments(namespace)            → confirm environments visible
+list_deployment_pipelines(namespace)    → confirm pipeline visible
 ```
 
 ### 2. Inspect Platform Infrastructure
 
 ```
 list_namespaces                              → what namespaces exist?
-list_cluster_dataplanes(namespace)           → what dataplanes are registered?
-get_cluster_dataplane(namespace, name)       → inspect spec + agent status
-list_cluster_buildplanes(namespace)          → what build capacity exists?
-list_cluster_observability_planes(namespace) → what observability is configured?
 list_environments(namespace)                 → what environments are available?
-get_deployment_pipeline(namespace, name)     → inspect promotion paths
+list_deployment_pipelines(namespace)         → what promotion paths exist?
+get_deployment_pipeline(namespace, name)     → inspect pipeline spec
+list_cluster_component_types(namespace)      → what component types are registered?
+list_cluster_traits(namespace)               → what traits are registered?
+list_workflows(namespace)                    → what build workflows exist?
+```
+
+For plane status (DataPlane, BuildPlane, ObservabilityPlane), inspect directly with kubectl:
+
+```bash
+kubectl get dataplane -n <namespace>
+kubectl get clusterdataplane
+kubectl describe dataplane default -n <namespace>
 ```
 
 ### 3. Register Component Types
@@ -253,11 +271,15 @@ get_deployment_pipeline(namespace, name)     → inspect promotion paths
 ComponentTypes and ClusterComponentTypes define the allowed workload shapes developers can deploy. Inspect before creating:
 
 ```
-list_cluster_component_types(namespace)         → what types exist?
-get_cluster_component_type(namespace, name)     → inspect one type
+list_cluster_component_types(namespace)            → what types exist?
+get_cluster_component_type(namespace, name)        → inspect one type
 get_cluster_component_type_schema(namespace, name) → see full schema with templates
-explain_schema(kind="ClusterComponentType", path="spec") → explore fields
-apply_resource(component_type_yaml)             → register a new type
+```
+
+Register new types via `occ apply` or `kubectl apply`:
+
+```bash
+kubectl apply -f clustercomponenttype.yaml
 ```
 
 ### 4. Register Traits
@@ -268,8 +290,6 @@ Traits are capabilities (ingress, storage, etc.) that can be attached to compone
 list_cluster_traits(namespace)              → what traits exist?
 get_cluster_trait(namespace, name)          → inspect one trait
 get_cluster_trait_schema(namespace, name)   → see full schema with patches
-explain_schema(kind="ClusterTrait", path="spec") → explore fields
-apply_resource(trait_yaml)                  → register a new trait
 ```
 
 ### 5. Register Workflow Templates
@@ -277,21 +297,29 @@ apply_resource(trait_yaml)                  → register a new trait
 Build workflow templates define how components are built:
 
 ```
-list_workflows(namespace)                   → what workflows exist?
-get_workflow_schema(namespace, name)        → inspect a workflow template
-apply_resource(workflow_yaml)               → register a new workflow template
+list_workflows(namespace)              → what workflows exist?
+get_workflow_schema(namespace, name)   → inspect a workflow template
+```
+
+Register new workflows via `occ apply` or `kubectl apply`:
+
+```bash
+kubectl apply -f workflow.yaml
 ```
 
 ### 6. Inspect Tenant Usage
 
 ```
-list_projects(namespace)                    → what projects exist?
-list_components(namespace, project)         → what components are deployed?
-get_component(namespace, project, component) → inspect spec and status conditions
-list_environments(namespace)                → what environments are active?
-get_environment_release(namespace, env)     → what release is live per env?
-list_release_bindings(namespace, project, component) → binding per environment
-list_secret_references(namespace)           → available secrets
+list_projects(namespace)                              → what projects exist?
+list_components(namespace, project)                   → what components are deployed?
+get_component(namespace, project, component)          → inspect spec and status conditions
+list_environments(namespace)                          → what environments are active?
+get_environment_release(namespace, env)               → what release is live per env?
+list_release_bindings(namespace, project, component)  → binding per environment
+get_release_binding(namespace, project, component, env) → binding for a specific env
+list_workloads(namespace, project, component)         → running workloads
+get_workload(namespace, project, component, workload) → workload spec and status
+list_secret_references(namespace)                     → available secrets
 ```
 
 ### 7. Validate Observability Stack (Observability MCP)
@@ -307,49 +335,42 @@ query_traces(namespace, project, component, environment)           → traces ar
 
 If any query returns no data, check the ObservabilityPlane agent connectivity and Helm configuration for that signal type.
 
-### 8. Generic Resource Operations
-
-```
-apply_resource(yaml_content)               → create or update any resource
-get_resource(kind, name, namespace)        → fetch any resource YAML
-delete_resource(kind, name, namespace)     → delete any resource
-explain_schema(kind, path)                 → understand any resource schema
-```
-
 ## Exploration Workflow (Start Here)
 
 When connecting to a new cluster, explore infrastructure state in this order:
 
 ```
 1. list_namespaces
-2. list_cluster_dataplanes(namespace)
-3. list_cluster_buildplanes(namespace)
-4. list_cluster_observability_planes(namespace)
-5. list_environments(namespace)
-6. get_deployment_pipeline(namespace, "default")
-7. list_cluster_component_types(namespace)
-8. list_cluster_traits(namespace)
-9. list_workflows(namespace)
+2. list_environments(namespace)
+3. list_deployment_pipelines(namespace)
+4. list_cluster_component_types(namespace)
+5. list_cluster_traits(namespace)
+6. list_workflows(namespace)
+7. list_projects(namespace)
+```
+
+For plane connectivity, use kubectl:
+
+```bash
+kubectl get clusterdataplane,clusterbuildplane,clusterobservabilityplane -A
 ```
 
 ## Common Gotchas
 
+**DataPlane/BuildPlane/ObservabilityPlane CRUD requires kubectl or occ apply**: There are no MCP tools for managing plane resources. Use `kubectl apply`, `occ apply`, or Helm values.
+
 **`deploymentPipelineRef` is a plain string**: In Project YAML, use `deploymentPipelineRef: default`, not an object with `kind`/`name`.
-
-**`apply_resource` is universal**: You can create any resource (DataPlane, Environment, DeploymentPipeline, ComponentType, Trait, Workflow, etc.) with `apply_resource(yaml)`.
-
-**`explain_schema` before authoring YAML**: Always call `explain_schema(kind="DataPlane", path="spec")` (or relevant kind) before hand-authoring resource YAML to discover required fields.
 
 **Namespace-scoped vs cluster-scoped**: `DataPlane`/`BuildPlane`/`ObservabilityPlane` come in both namespace-scoped and cluster-scoped (`ClusterDataPlane`, etc.) variants. Use cluster-scoped for shared infrastructure; namespace-scoped for tenant isolation.
 
-**Status conditions are your debug tool**: `get_dataplane`, `get_environment`, `get_component` all return `status.conditions`. Check `reason` and `message` fields for any resource that isn't `Ready`.
+**Status conditions are your debug tool**: `get_environment`, `get_component`, and `get_workload` all return `status.conditions`. Check `reason` and `message` fields for any resource that isn't `Ready`.
 
-**`get_resource` is a fallback**: For resource kinds not covered by a dedicated MCP tool, use `get_resource(kind, name, namespace)` to retrieve full YAML.
+**Inspect component type schema before authoring component YAML**: Call `get_cluster_component_type_schema` to discover required fields. Do not guess component type shapes.
+
+**`get_cluster_component_type_schema` vs `get_component_type_schema`**: Cluster-scoped types (`ClusterComponentType`) are the most common. Namespace-scoped types (`ComponentType`) are for tenant isolation. Use the cluster-scoped tools first.
 
 **Two separate MCP servers**: `mcp__openchoreo-cp__*` targets the control plane API; `mcp__openchoreo-obs__*` targets the Observer API. Both require separate registration. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
 
-**`create_workload` is broken in v0.17 — use the REST API directly**: The MCP tool fails with "resource name may not be empty". Fall back to the control plane REST API. See `openchoreo-developer/references/mcp-reference.md` for the curl pattern.
+**No observability data after plane registration**: Inspect the ObservabilityPlane with `kubectl describe`. Missing data usually means the agent CA cert is wrong or `observerURL` is unreachable.
 
-**`connections` must be an array, not a map**: `get_workload_schema` incorrectly reports connections as a JSON object. The REST API requires an array.
-
-**No observability data after plane registration**: Verify the ObservabilityPlane `status.conditions` with `get_resource(kind="ObservabilityPlane", ...)`. Missing data usually means the agent CA cert is wrong or `observerURL` is unreachable.
+**`connections` must be an array, not a map**: The `get_workload_schema` may report connections as a JSON object. The API requires an array of connection objects.
