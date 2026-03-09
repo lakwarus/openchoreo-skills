@@ -1,8 +1,7 @@
 # CLI and Resources
 
 <!-- Quick navigation
-- [occ Installation](#occ-installation)
-- [Setup and Authentication](#setup-and-authentication)
+- [occ Installation and Login](#occ-installation-and-login)
 - [Creating Platform Resources with occ](#creating-platform-resources-with-occ)
 - [PE-Relevant occ Commands](#pe-relevant-occ-commands)
 - [Resource Schemas](#resource-schemas)
@@ -63,10 +62,12 @@ For local setup, ensure `/etc/hosts` has entries for `api.openchoreo.localhost`,
 
 Once authenticated, use `occ apply -f` to create any platform resource. This covers operations not available as MCP tools (Environment, DeploymentPipeline, DataPlane, etc.).
 
+> **Gotcha**: `occ apply -f -` (stdin) does not work — error: `path - does not exist`. Write YAML to a temp file first, then apply.
+
 ### Create an Environment
 
 ```bash
-cat <<EOF | occ apply -f -
+cat > /tmp/env.yaml <<'EOF'
 apiVersion: openchoreo.dev/v1alpha1
 kind: Environment
 metadata:
@@ -83,6 +84,7 @@ spec:
     name: default
   isProduction: false
 EOF
+occ apply -f /tmp/env.yaml
 ```
 
 Set `isProduction: true` for production environments.
@@ -90,7 +92,7 @@ Set `isProduction: true` for production environments.
 ### Create a DeploymentPipeline
 
 ```bash
-cat <<EOF | occ apply -f -
+cat > /tmp/pipeline.yaml <<'EOF'
 apiVersion: openchoreo.dev/v1alpha1
 kind: DeploymentPipeline
 metadata:
@@ -138,7 +140,7 @@ occ project list
 
 ## PE-Relevant occ Commands
 
-PEs use both `occ` and `kubectl`. Use `occ` for OpenChoreo abstractions, `kubectl` for cluster-level operations and debugging.
+Prefer `occ` for all OpenChoreo resource management. Use `kubectl` only for cluster-level operations that `occ` cannot reach (e.g. controller logs, raw CRD inspection).
 
 ### Quick reference
 
@@ -166,7 +168,7 @@ PEs use both `occ` and `kubectl`. Use `occ` for OpenChoreo abstractions, `kubect
 - `occ <resource> get <name>` returns full YAML (spec + status). No `-o` flag.
 - Scope flags are not uniform across `occ` subcommands. Many `list` commands accept `--project`, while many `get` commands use `--namespace` only. Check `--help` on the exact subcommand when scope matters.
 - `occ apply -f` works for all resource types including platform resources.
-- Service account login: `occ login --client-credentials --client-id <id> --client-secret <secret>`
+- Service account login: `occ login --client-credentials --client-id <id> --client-secret <secret>` — only works if that client is configured for the occ OIDC flow. The `service_mcp_client` is **not** — use browser-based `occ login` instead.
 
 ## Resource Schemas
 

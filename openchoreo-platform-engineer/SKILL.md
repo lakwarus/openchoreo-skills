@@ -1,7 +1,7 @@
 ---
 name: openchoreo-platform-engineer
 description: |
-  Use this whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. Prefer MCP tools and the REST API over kubectl; use occ for resource management. If the same task also involves deploying or debugging an application through `occ`, activate `openchoreo-developer` too instead of waiting to escalate later.
+  Use this whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. Prefer MCP tools, then occ, over kubectl. If the same task also involves deploying or debugging an application through `occ`, activate `openchoreo-developer` too instead of waiting to escalate later.
 ---
 
 # OpenChoreo Platform Engineer Guide
@@ -37,7 +37,7 @@ Prefer progressive discovery over memorized specifics:
 
 **Tool preference order: MCP tools → occ / REST API → kubectl (last resort)**
 
-Read `references/cli-and-resources.md` for occ installation, authentication, and the REST API fallback patterns before reaching for kubectl.
+Read `references/cli-and-resources.md` for occ installation, authentication, and platform resource creation patterns before reaching for kubectl.
 
 Treat the live cluster and current repo as the source of truth. If a remembered field name, example, or behavior conflicts with current output, trust the current output and then confirm in the relevant reference file or repository source.
 
@@ -120,9 +120,9 @@ If the platform change succeeded but the app still fails, hand off to or continu
 Keep these in mind because they are durable and high-value:
 
 - **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
-- `create_environment` and `create_deployment_pipeline` are not MCP tools — use the REST API with a bearer token. See `references/cli-and-resources.md`.
+- `create_environment` and `create_deployment_pipeline` are not MCP tools — use `occ apply -f`. See `references/cli-and-resources.md` → Creating Platform Resources with occ.
 - `occ` must be installed **and** logged in before any `occ apply` will work. See `references/cli-and-resources.md` → occ Installation and Login, or https://openchoreo.dev/docs/user-guide/cli-installation/. `occ login` with `service_mcp_client` does not work — use browser-based login.
-- `create_project` via MCP defaults to `deploymentPipelineRef: default` — use a REST API PUT to reassign.
+- `create_project` via MCP defaults to `deploymentPipelineRef: default` — use `occ apply -f` with the correct `deploymentPipelineRef` instead.
 - Upgrade order matters; do not move a remote plane ahead of the control plane.
 - Scope matters; cluster-scoped and namespace-scoped resources are not interchangeable.
 - `status.conditions`, live resource YAML, and current controller logs are better truth sources than memory.
