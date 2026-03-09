@@ -1,27 +1,31 @@
 # OCC CLI Reference
 
-The `occ` CLI manages OpenChoreo resources. Config lives at `~/.occ/config.yaml`.
+The `occ` CLI manages OpenChoreo resources.
 
 ## Install
 
-Download to `/tmp` to keep the working directory clean:
+Download from GitHub releases (v0.17.0 is the current supported version):
 
 ```bash
-# macOS Apple Silicon
-curl -L https://nightly.link/openchoreo/openchoreo/workflows/build-and-test/main/occ.zip -o /tmp/occ.zip
-unzip /tmp/occ.zip -d /tmp/occ-bin
-chmod +x /tmp/occ-bin/darwin/arm64/occ
-sudo mv /tmp/occ-bin/darwin/arm64/occ /usr/local/bin/
-rm -rf /tmp/occ.zip /tmp/occ-bin
+# macOS Apple Silicon (ARM64)
+curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz" \
+  -o /tmp/occ.tar.gz && tar -xzf /tmp/occ.tar.gz -C /tmp && chmod +x /tmp/occ
 
-# For releases: download from github.com/openchoreo/openchoreo/releases
-# curl -L <release-url> -o /tmp/occ.tar.gz
-# tar -xzf /tmp/occ.tar.gz -C /tmp/occ-bin && chmod +x /tmp/occ-bin/occ && sudo mv /tmp/occ-bin/occ /usr/local/bin/
+# macOS Intel (AMD64)
+curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz" \
+  -o /tmp/occ.tar.gz && tar -xzf /tmp/occ.tar.gz -C /tmp && chmod +x /tmp/occ
+
+# Optionally move to PATH
+sudo mv /tmp/occ /usr/local/bin/occ
 ```
+
+Check latest release: `https://github.com/openchoreo/openchoreo/releases/latest`
 
 Platforms: `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`
 
 Verify: `occ version`
+
+> **Note**: `~/.choreo/bin/choreo` is the WSO2 commercial Choreo CLI — a different product. It cannot manage OpenChoreo resources.
 
 ## Setup Flow
 
@@ -46,6 +50,8 @@ occ config context use myctx
 ```
 
 Service account login: `occ login --client-credentials --client-id <id> --client-secret <secret>`
+
+> **Gotcha**: The `service_mcp_client` service account used for MCP tokens does **not** work with `occ login --client-credentials`. The error is `unauthorized_client`. Use a REST API bearer token instead — see `openchoreo-platform-engineer/references/cli-and-resources.md` → Setup and Authentication.
 
 ## Config Modes
 

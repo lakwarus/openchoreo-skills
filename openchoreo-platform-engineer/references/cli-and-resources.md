@@ -3,7 +3,7 @@
 <!-- Quick navigation
 - [occ Installation](#occ-installation)
 - [Setup and Authentication](#setup-and-authentication)
-- [REST API Fallback](#rest-api-fallback-when-mcp-tools-are-missing)
+- [Creating Platform Resources with occ](#creating-platform-resources-with-occ)
 - [PE-Relevant occ Commands](#pe-relevant-occ-commands)
 - [Resource Schemas](#resource-schemas)
 -->
@@ -41,105 +41,91 @@ Check latest release at: https://github.com/openchoreo/openchoreo/releases/lates
 
 **occ login with `service_mcp_client` does NOT work** — this client is not configured for the occ OIDC flow. The error will be `unauthorized_client: Client is not allowed to use the specified token endpoint authentication method`.
 
-Instead, get a bearer token via curl and use the REST API directly (see below).
+Use interactive login (browser) or a properly configured service account. For the local setup, interactive login works:
 
 ```bash
-# Local setup — get a token
-MCP_TOKEN=$(curl -s -X POST "http://thunder.openchoreo.localhost:8080/oauth2/token" \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -u 'service_mcp_client:service_mcp_client_secret' \
-  -d 'grant_type=client_credentials' | jq -r '.access_token')
-
-# Verify the API is reachable
-curl -s -H "Authorization: Bearer $MCP_TOKEN" \
-  "http://api.openchoreo.localhost:8080/api/v1/namespaces"
+/tmp/occ config controlplane update default --url http://api.openchoreo.localhost:8080
+/tmp/occ login        # opens browser for PKCE auth
+/tmp/occ namespace list  # verify connection
 ```
 
-The token and identity server URLs are in `local-refresh-openchoreo-mcp.sh` at the repo root.
+The identity server URL is in `local-refresh-openchoreo-mcp.sh` at the repo root.
 
-## REST API Fallback (when MCP tools are missing)
+## Creating Platform Resources with occ
 
-The MCP server does **not** expose `create_environment` or `create_deployment_pipeline`. Use the REST API directly.
-
-### API base pattern
-
-```
-http://api.openchoreo.localhost:8080/api/v1/namespaces/{namespace}/{resource}
-```
+Once authenticated, use `occ apply -f` to create any platform resource. This covers operations not available as MCP tools (Environment, DeploymentPipeline, DataPlane, etc.).
 
 ### Create an Environment
 
 ```bash
-curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/environments" \
-  -H "Authorization: Bearer $MCP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "metadata": {
-      "name": "qa",
-      "namespace": "default",
-      "labels": {"openchoreo.dev/name": "qa"},
-      "annotations": {
-        "openchoreo.dev/display-name": "QA",
-        "openchoreo.dev/description": "QA"
-      }
-    },
-    "spec": {
-      "dataPlaneRef": {"kind": "DataPlane", "name": "default"},
-      "isProduction": false
-    }
-  }'
+cat <<EOF | occ apply -f -
+apiVersion: openchoreo.dev/v1alpha1
+kind: Environment
+metadata:
+  name: qa
+  namespace: default
+  labels:
+    openchoreo.dev/name: qa
+  annotations:
+    openchoreo.dev/display-name: QA
+    openchoreo.dev/description: QA
+spec:
+  dataPlaneRef:
+    kind: DataPlane
+    name: default
+  isProduction: false
+EOF
 ```
 
-Set `"isProduction": true` for production environments.
+Set `isProduction: true` for production environments.
 
 ### Create a DeploymentPipeline
 
 ```bash
-curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/deploymentpipelines" \
-  -H "Authorization: Bearer $MCP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "metadata": {
-      "name": "my-pipeline",
-      "namespace": "default",
-      "labels": {"openchoreo.dev/name": "my-pipeline"},
-      "annotations": {
-        "openchoreo.dev/display-name": "My Pipeline",
-        "openchoreo.dev/description": "dev → staging → production"
-      }
-    },
-    "spec": {
-      "promotionPaths": [
-        {"sourceEnvironmentRef": "development", "targetEnvironmentRefs": [{"name": "staging", "requiresApproval": false}]},
-        {"sourceEnvironmentRef": "staging", "targetEnvironmentRefs": [{"name": "production", "requiresApproval": false}]}
-      ]
-    }
-  }'
+cat <<EOF | occ apply -f -
+apiVersion: openchoreo.dev/v1alpha1
+kind: DeploymentPipeline
+metadata:
+  name: foo-pipeline
+  namespace: default
+  annotations:
+    openchoreo.dev/display-name: Foo Pipeline
+    openchoreo.dev/description: "development → qa → production"
+spec:
+  promotionPaths:
+    - sourceEnvironmentRef: development
+      targetEnvironmentRefs:
+        - name: qa
+          requiresApproval: false
+    - sourceEnvironmentRef: qa
+      targetEnvironmentRefs:
+        - name: production
+          requiresApproval: false
+EOF
 ```
 
-### Update a Project's pipeline assignment
-
-Projects are created via MCP (`create_project`) but default to `deploymentPipelineRef: default`. Use PUT to reassign:
+### Create or Update a Project
 
 ```bash
-curl -s -X PUT "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/projects/foo" \
-  -H "Authorization: Bearer $MCP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"metadata":{"name":"foo","namespace":"default"},"spec":{"deploymentPipelineRef":"foo-pipeline"}}'
+cat <<EOF | occ apply -f -
+apiVersion: openchoreo.dev/v1alpha1
+kind: Project
+metadata:
+  name: foo
+  namespace: default
+spec:
+  deploymentPipelineRef: foo-pipeline   # plain string, not an object
+EOF
 ```
 
-**Use PUT, not PATCH** — PATCH returns an empty response on this API.
+> **Note**: `create_project` via MCP always defaults to `deploymentPipelineRef: default`. Use `occ apply` when you need a specific pipeline assigned at creation time.
 
-### Other useful REST endpoints
+### Verify after applying
 
 ```bash
-# List any resource
-curl -s -H "Authorization: Bearer $MCP_TOKEN" \
-  "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/{resource}"
-
-# Get a specific resource
-curl -s -H "Authorization: Bearer $MCP_TOKEN" \
-  "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/{resource}/{name}"
+occ environment list
+occ deploymentpipeline list
+occ project list
 ```
 
 ## PE-Relevant occ Commands

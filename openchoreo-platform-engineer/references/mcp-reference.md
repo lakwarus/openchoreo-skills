@@ -2,11 +2,11 @@
 
 This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
-> **Note on platform resource management**: The following operations are **not available as MCP tools** — use the REST API directly (see `cli-and-resources.md` → REST API Fallback section):
+> **Note on platform resource management**: The following operations are **not available as MCP tools** — use `occ apply -f` instead (see `cli-and-resources.md` → Creating Platform Resources with occ):
 > - `create_environment` / `create_deployment_pipeline`
 > - DataPlane, BuildPlane, ObservabilityPlane CRUD
 >
-> Projects created via `create_project` MCP default to `deploymentPipelineRef: default`. Use a REST API PUT to reassign the pipeline after creation.
+> Projects created via `create_project` MCP default to `deploymentPipelineRef: default`. Use `occ apply -f` to create the project with the correct pipeline, or reapply after creation.
 
 ## Tool Quick Reference
 
@@ -231,39 +231,37 @@ spec:
 
 ### 1. Initial Platform Setup
 
-Environments and DeploymentPipelines have no MCP create tools — use the REST API (see `cli-and-resources.md` → REST API Fallback). Plane resources (DataPlane, BuildPlane, ObservabilityPlane) require `kubectl apply`.
+Environments and DeploymentPipelines have no MCP create tools — use `occ apply -f` (see `cli-and-resources.md` → Creating Platform Resources with occ). Plane resources (DataPlane, BuildPlane, ObservabilityPlane) also use `occ apply -f`.
 
 ```bash
-# Step 1 — get a token (local setup)
-MCP_TOKEN=$(curl -s -X POST "http://thunder.openchoreo.localhost:8080/oauth2/token" \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -u 'service_mcp_client:service_mcp_client_secret' \
-  -d 'grant_type=client_credentials' | jq -r '.access_token')
+# Step 1 — login to occ (local setup)
+occ config controlplane update default --url http://api.openchoreo.localhost:8080
+occ login    # browser-based PKCE auth
 
-# Step 2 — create environments via REST API
-curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/environments" \
-  -H "Authorization: Bearer $MCP_TOKEN" -H "Content-Type: application/json" \
-  -d '{"metadata":{"name":"development","namespace":"default","labels":{"openchoreo.dev/name":"development"}},"spec":{"dataPlaneRef":{"kind":"DataPlane","name":"default"},"isProduction":false}}'
+# Step 2 — create environments via occ apply
+occ apply -f environment-development.yaml
+occ apply -f environment-production.yaml
 
-# Step 3 — create deployment pipeline via REST API
-curl -s -X POST "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/deploymentpipelines" \
-  -H "Authorization: Bearer $MCP_TOKEN" -H "Content-Type: application/json" \
-  -d '{"metadata":{"name":"my-pipeline","namespace":"default"},"spec":{"promotionPaths":[...]}}'
+# Step 3 — create deployment pipeline via occ apply
+occ apply -f my-pipeline.yaml
 ```
 
-Then use MCP to create a project and assign the pipeline:
+See `cli-and-resources.md` → Creating Platform Resources with occ for YAML examples.
 
-```
-create_namespace(name)                 → via MCP
-create_project(namespace, name)        → via MCP (defaults to "default" pipeline)
-```
-
-Then reassign the pipeline via REST PUT (create_project ignores pipeline ref):
+Then use MCP or occ to create a project with the correct pipeline:
 
 ```bash
-curl -s -X PUT "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/projects/<name>" \
-  -H "Authorization: Bearer $MCP_TOKEN" -H "Content-Type: application/json" \
-  -d '{"metadata":{"name":"<name>","namespace":"default"},"spec":{"deploymentPipelineRef":"<pipeline>"}}'
+# Via occ (sets pipeline at creation time)
+occ apply -f project.yaml   # spec.deploymentPipelineRef: my-pipeline
+```
+
+Or via MCP then fix the pipeline ref with occ:
+
+```
+create_project(namespace, name)   → defaults to "default" pipeline
+```
+```bash
+occ apply -f project.yaml         # reapply with correct deploymentPipelineRef
 ```
 
 Verify with MCP:
@@ -388,7 +386,7 @@ Fall back to `kubectl` only if the REST API does not expose the resource.
 
 ## Common Gotchas
 
-**`create_environment` and `create_deployment_pipeline` are not MCP tools**: Use the REST API directly. See `cli-and-resources.md` → REST API Fallback for exact curl patterns and auth setup.
+**`create_environment` and `create_deployment_pipeline` are not MCP tools**: Use `occ apply -f` instead. See `cli-and-resources.md` → Creating Platform Resources with occ for YAML examples and auth setup.
 
 **DataPlane/BuildPlane/ObservabilityPlane CRUD is not exposed via MCP or REST API**: Use `occ apply -f <file>` if occ is available, otherwise `kubectl apply`. Helm values control plane registration at install time.
 
