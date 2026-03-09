@@ -4,24 +4,27 @@ The `occ` CLI manages OpenChoreo resources.
 
 ## Install
 
-Download from GitHub releases (v0.17.0 is the current supported version):
+> **Official docs**: https://openchoreo.dev/docs/user-guide/cli-installation/
 
 ```bash
 # macOS Apple Silicon (ARM64)
-curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz" \
-  -o /tmp/occ.tar.gz && tar -xzf /tmp/occ.tar.gz -C /tmp && chmod +x /tmp/occ
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
 
 # macOS Intel (AMD64)
-curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz" \
-  -o /tmp/occ.tar.gz && tar -xzf /tmp/occ.tar.gz -C /tmp && chmod +x /tmp/occ
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
 
-# Optionally move to PATH
-sudo mv /tmp/occ /usr/local/bin/occ
+# Linux x64
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_amd64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
+
+# Linux ARM64
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_arm64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
 ```
 
-Check latest release: `https://github.com/openchoreo/openchoreo/releases/latest`
-
-Platforms: `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`
+Check latest release: https://github.com/openchoreo/openchoreo/releases/latest
 
 Verify: `occ version`
 
@@ -51,7 +54,7 @@ occ config context use myctx
 
 Service account login: `occ login --client-credentials --client-id <id> --client-secret <secret>`
 
-> **Gotcha**: The `service_mcp_client` service account used for MCP tokens does **not** work with `occ login --client-credentials`. The error is `unauthorized_client`. Use a REST API bearer token instead — see `openchoreo-platform-engineer/references/cli-and-resources.md` → Setup and Authentication.
+> **Gotcha**: The `service_mcp_client` service account used for MCP tokens does **not** work with `occ login --client-credentials`. The error is `unauthorized_client`. Use browser-based `occ login` instead, or a service account specifically configured for the occ OIDC flow. See the official docs: https://openchoreo.dev/docs/user-guide/cli-installation/
 
 ## Config Modes
 

@@ -121,7 +121,7 @@ Keep these in mind because they are durable and high-value:
 
 - **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
 - `create_environment` and `create_deployment_pipeline` are not MCP tools — use the REST API with a bearer token. See `references/cli-and-resources.md`.
-- `occ` is not installed by default — download from GitHub releases. `occ login` with `service_mcp_client` does not work; get a bearer token via curl instead.
+- `occ` must be installed **and** logged in before any `occ apply` will work. See `references/cli-and-resources.md` → occ Installation and Login, or https://openchoreo.dev/docs/user-guide/cli-installation/. `occ login` with `service_mcp_client` does not work — use browser-based login.
 - `create_project` via MCP defaults to `deploymentPipelineRef: default` — use a REST API PUT to reassign.
 - Upgrade order matters; do not move a remote plane ahead of the control plane.
 - Scope matters; cluster-scoped and namespace-scoped resources are not interchangeable.

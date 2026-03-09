@@ -8,50 +8,58 @@
 - [Resource Schemas](#resource-schemas)
 -->
 
-## occ Installation
+## occ Installation and Login
 
-`occ` is the OpenChoreo CLI. It is **not installed by default** — download from GitHub releases:
+> **Official docs**: https://openchoreo.dev/docs/user-guide/cli-installation/
+>
+> **Prerequisite**: `occ` must be installed **and** logged in before any `occ` commands or `occ apply` will work. Complete both steps below before attempting to manage platform resources.
 
-```bash
-# macOS ARM64 (Apple Silicon)
-curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz" -o /tmp/occ.tar.gz
-tar -xzf /tmp/occ.tar.gz -C /tmp
-chmod +x /tmp/occ
-/tmp/occ version   # verify
-
-# macOS AMD64 (Intel)
-curl -L "https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz" -o /tmp/occ.tar.gz
-tar -xzf /tmp/occ.tar.gz -C /tmp && chmod +x /tmp/occ
-```
-
-Check latest release at: https://github.com/openchoreo/openchoreo/releases/latest
-
-**Note**: The `choreo` binary at `~/.choreo/bin/choreo` is the WSO2 commercial Choreo cloud CLI — it is a different product and cannot manage OpenChoreo resources.
-
-## Setup and Authentication
-
-### Point occ at the control plane
+### Step 1 — Install
 
 ```bash
-# Local setup
-/tmp/occ config controlplane update default --url http://api.openchoreo.localhost:8080
+# macOS Apple Silicon (ARM64)
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
+
+# macOS Intel (AMD64)
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
+
+# Linux x64
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_amd64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
+
+# Linux ARM64
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_arm64.tar.gz \
+  | tar -xz && sudo mv occ /usr/local/bin/
+
+occ version   # verify
 ```
 
-### Authentication
+Check latest release: https://github.com/openchoreo/openchoreo/releases/latest
 
-**occ login with `service_mcp_client` does NOT work** — this client is not configured for the occ OIDC flow. The error will be `unauthorized_client: Client is not allowed to use the specified token endpoint authentication method`.
+> **Note**: `~/.choreo/bin/choreo` is the WSO2 commercial Choreo cloud CLI — a different product that cannot manage OpenChoreo resources.
 
-Use interactive login (browser) or a properly configured service account. For the local setup, interactive login works:
+### Step 2 — Configure and Login
 
 ```bash
-/tmp/occ config controlplane update default --url http://api.openchoreo.localhost:8080
-/tmp/occ login        # opens browser for PKCE auth
-/tmp/occ namespace list  # verify connection
+# Point occ at the control plane (replace URL with your actual endpoint)
+occ config controlplane update default --url http://api.openchoreo.localhost:8080
+
+# Login (opens browser for PKCE authentication)
+occ login
+
+# Verify connection
+occ namespace list
 ```
 
-The identity server URL is in `local-refresh-openchoreo-mcp.sh` at the repo root.
+For local setup, ensure `/etc/hosts` has entries for `api.openchoreo.localhost`, `thunder.openchoreo.localhost`, and `observer.openchoreo.localhost` pointing to `127.0.0.1`.
+
+> **Important**: The `service_mcp_client` used for MCP tokens does **not** work with `occ login --client-credentials`. Use browser-based login (`occ login`) or a service account specifically configured for the occ OIDC flow.
 
 ## Creating Platform Resources with occ
+
+> **Prerequisite**: Complete occ Installation and Login above before running any command in this section. If `occ` is not installed or not logged in, these commands will fail.
 
 Once authenticated, use `occ apply -f` to create any platform resource. This covers operations not available as MCP tools (Environment, DeploymentPipeline, DataPlane, etc.).
 
