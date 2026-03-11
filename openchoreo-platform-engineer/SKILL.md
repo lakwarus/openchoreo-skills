@@ -119,6 +119,7 @@ If the platform change succeeded but the app still fails, hand off to or continu
 
 Keep these in mind because they are durable and high-value:
 
+- **Default to the `default` namespace.** Unless the user explicitly asks to create a new namespace, provision all environments, pipelines, and projects inside the existing `default` namespace. Always ask the user before creating a new namespace — new namespaces represent a significant organisational boundary and should be a conscious decision.
 - **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
 - `create_environment` and `create_deployment_pipeline` are not MCP tools — use `occ apply -f`. See `references/cli-and-resources.md` → Creating Platform Resources with occ.
 - `occ` must be installed **and** logged in before any `occ apply` will work. See `references/cli-and-resources.md` → occ Installation and Login, or https://openchoreo.dev/docs/user-guide/cli-installation/. `occ login` with `service_mcp_client` does not work — use browser-based login.
@@ -136,3 +137,4 @@ Keep these in mind because they are durable and high-value:
 - Performing wide cluster sweeps before checking the affected object and logs
 - Treating app-level deployment symptoms as purely platform issues without checking the app resource chain
 - Making several platform changes at once and losing the causal signal
+- Creating a new namespace without asking the user — default to `default` unless explicitly told otherwise

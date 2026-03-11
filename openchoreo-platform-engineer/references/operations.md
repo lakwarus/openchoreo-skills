@@ -9,6 +9,9 @@
 
 ## Namespace Provisioning
 
+> **Policy: ask before creating a new namespace.**
+> The `default` namespace is the standard home for all projects, environments, and pipelines unless the user explicitly requests a separate namespace. New namespaces represent an organisational boundary (separate team isolation, RBAC boundary, or multi-tenancy). Always confirm with the user before running `create_namespace` or `kubectl create namespace`. If no namespace is specified, use `default`.
+
 Every controlplane namespace needs a minimum set of resources before developers can use it.
 
 ### Create and label the namespace
