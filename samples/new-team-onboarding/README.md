@@ -149,7 +149,7 @@ Claude verifies all resources are visible on the live cluster:
 | **Resources created** | 2 environments, 2 pipelines, 2 projects |
 | **Errors / retries** | 0 |
 | **Claude model** | Claude Sonnet 4.6 |
-| **Token usage (approx)** | ~8,000–12,000 tokens (input + output across all tool calls) |
+| **Token usage (approx)** | less than 2k tokens (input + output across all tool calls) |
 
 > **Comparison**: Doing this manually — writing 6 YAML files, running 6 `occ apply` commands, and verifying in the UI — typically takes 15–30 minutes for a PE who knows the resource model, and longer for anyone unfamiliar with the `deploymentPipelineRef` gotcha or the `occ apply -f -` stdin limitation.
 
