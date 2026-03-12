@@ -628,30 +628,32 @@ For each service in the project:
 
 After changes, tell the user exactly what was modified and why, so they understand the pattern for future services.
 
-## Deploying Public Third-Party Apps (e.g., Google microservices-demo)
+## Deploying Public Third-Party / Multi-Service Apps
 
-When a user asks you to deploy a well-known open-source or Google-published app into OpenChoreo, follow this specialised path rather than the general source-build path.
+When a user asks you to deploy a well-known open-source or publicly published multi-service app, follow this path rather than the general source-build path.
 
 ### Step 1 — Check whether pre-built images exist
 
 Before touching Dockerfiles or build workflows, look for official published images:
 
-- GitHub releases page or `release/` directory in the repo (e.g., `kubernetes-manifests.yaml`)
-- Docker Hub, Google Artifact Registry, GHCR
-- README or CI workflows that reference image registries
+- GitHub releases page or `release/` / `deploy/` directory in the repo
+- Docker Hub, GitHub Container Registry (GHCR), cloud vendor registries
+- README or CI workflows that reference image tags
 
-If pre-built images exist, **always use BYO image path**. Do not attempt a source build. Source builds commonly fail for third-party repos because they use multi-platform Docker syntax (`ARG BUILDPLATFORM`) that OpenChoreo's buildah builder does not support.
+If pre-built images exist, **always use the BYO image path**. Do not attempt a source build.
+
+**Why source builds commonly fail for third-party repos:** Many projects use multi-platform Docker syntax (`ARG BUILDPLATFORM`, `FROM --platform=$BUILDPLATFORM`) for cross-architecture builds. OpenChoreo's buildah-based builder does not support this syntax and exits with code 125. If a source build fails with exit code 125 and the log mentions `BUILDPLATFORM` or `attempted to redefine "BUILDPLATFORM"`, switch to the pre-built image immediately.
 
 ### Step 2 — Read the official Kubernetes manifests for required env vars
 
-The official Kubernetes manifests are the ground truth for what each service needs. Fetch them and extract:
+The official Kubernetes manifests (or Helm values, docker-compose files) are the ground truth for what each service needs to start. Before writing any workload YAML, fetch them and extract:
 
-- Required env vars per service (ports, feature flags, service addresses)
-- `DISABLE_PROFILER`, `DISABLE_TRACING`, `DISABLE_STATS` flags
-- `PORT` env var values
-- Optional service addresses that must be set to prevent startup panics
+- **Listen port** — many apps read `PORT` from the environment; the manifest shows the expected value
+- **Feature flags** — vendor telemetry, profiling, tracing, and stats are often enabled by default but crash outside the target cloud environment; manifests show the disable flags
+- **Service address env vars** — some services are wired by explicit env vars, not connection injection
+- **Optional service addresses** — addresses for services that may not be deployed in your setup
 
-**Do not assume connections alone are sufficient.** Many services also need a `PORT` env var and GCP-specific feature flags.
+**Do not assume connections alone are sufficient.** Connections inject service addresses, but they do not provide `PORT`, feature flags, or other app-level config.
 
 ### Step 3 — Create components without workflows
 
@@ -661,64 +663,75 @@ For BYO image deployments, call `create_component` **without** the `workflow` pa
 create_component(namespace, project, name, componentType)   ← no workflow param
 ```
 
-### Step 4 — Create workloads with full env vars
+### Step 4 — Create workloads with full env vars from the official manifests
 
 Apply workloads using `occ apply -f <file>` for batches. Each workload must include:
 
 1. The pre-built image
-2. All env vars from the official manifest (`PORT`, `DISABLE_PROFILER`, etc.)
+2. **All env vars from the official manifest** — `PORT`, feature flags, and any explicit service addresses not covered by connections
 3. Connections for service-to-service communication (using `envBindings`)
 
 **`connections` is always an array, not a map:**
 
 ```yaml
 connections:
-- name: redis                     # required name field
-  component: redis-cart
-  endpoint: redis
+- name: cache                     # required name field
+  component: my-cache
+  endpoint: tcp
   visibility: project
   envBindings:
-    address: REDIS_ADDR
+    address: CACHE_ADDR
 ```
 
-### Common env var patterns for GCP demo apps
+### Common patterns when running cloud-native apps outside their native cloud
 
-| Env var | Value | Affected services |
-|---------|-------|-------------------|
-| `DISABLE_PROFILER` | `"1"` | currencyservice, productcatalogservice, paymentservice, shippingservice, emailservice, recommendationservice |
-| `ENABLE_PROFILER` | `"0"` | frontend |
-| `PORT` | service-specific | All services — check official manifests |
-| `USERS` | `"10"` | loadgenerator |
-| `RATE` | `"1"` | loadgenerator |
+Many apps built for a specific cloud platform bundle vendor SDKs — profilers, distributed tracers, metric exporters, log forwarders — that are loaded eagerly at startup. Outside the target cloud, these SDKs may:
 
-**Why DISABLE_PROFILER?** The Google demo images bundle `@google-cloud/profiler` (a native Node.js module). Outside GCP, the `pprof` native binary for `linux-x64-musl` is missing, causing the process to crash before the gRPC server starts. `DISABLE_PROFILER=1` skips the profiler load.
+- Fail to load a required native binary (process crashes before serving any traffic)
+- Hang waiting for a metadata endpoint that does not exist
+- Emit noisy errors but continue running
 
-### Optional/AI service addresses
+**Detection:** A service with `status: Ready` that immediately crash-loops, logs a native module load error or SDK init failure before any application output, and never logs a "server listening on port X" message.
 
-Some newer versions of demo apps reference optional services (e.g., `SHOPPING_ASSISTANT_SERVICE_ADDR` in the microservices-demo frontend). If the env var is required by the app but the service is not deployed:
+**Fix pattern:** Look for a disable flag in the official manifests or SDK documentation:
 
-- Set the env var to a dummy address (e.g., `"shoppingassistantservice:80"`) so the container starts
-- The feature will fail gracefully at runtime when called
+| Pattern | Common flag | Notes |
+|---------|-------------|-------|
+| Profiler SDK (any vendor) | `DISABLE_PROFILER=1` or `ENABLE_PROFILER=0` | Check per-service in official manifests |
+| Distributed tracing SDK | `DISABLE_TRACING=1` or `OTEL_SDK_DISABLED=true` | Varies by SDK |
+| Stats/metrics exporter | `DISABLE_STATS=1` | Check official manifests |
+| Cloud metadata dependency | Set dummy endpoint env var | Some SDKs hit metadata server on startup |
+
+**Always check the official manifests first** — they typically already set the correct disable flags for out-of-cloud deployment.
+
+### Optional services and missing env vars
+
+Apps may `panic` or crash at startup if an env var for an optional or add-on service is not set (e.g., an AI assistant service, a recommendation engine, a payments sandbox). If the env var is required by the app code but the service is not deployed:
+
+- Set the env var to a placeholder address (e.g., `"optional-service:80"`)
+- The app will start; calls to that service will fail at runtime, not at startup
+- Log the placeholder so it is visible and can be replaced when the service is deployed
 
 ### Multi-service deployment approach
 
-For 10+ service apps, batch workloads into YAML files and apply with `occ apply`:
+For apps with many services, batch workloads into YAML files and apply with `occ apply`:
 
-1. Write all workloads (without connections) to one file — apply first
-2. Write workloads with connections to a second file — apply second
+1. Write workloads **without** connections to one file — apply first (simpler, creates all base deployments)
+2. Write workloads **with** connections to a second file — apply second
 3. Verify with `list_release_bindings` per component
-4. For any service still failing, immediately check `query_component_logs` — don't assume it's a platform issue
+4. For any service still failing, immediately check `query_component_logs` — do not assume a platform issue before reading the app logs
 
 ### Checklist for third-party app deployment
 
-1. [ ] Find pre-built image registry (GitHub releases, Docker Hub, GCR, GHCR)
-2. [ ] Fetch official Kubernetes manifests — extract env vars for every service
-3. [ ] Create a project (without workflow)
-4. [ ] Create all components via `create_component` without `workflow` parameter
-5. [ ] Create workloads via `occ apply` with: image, all env vars, connections
-6. [ ] Check release binding status for each component
-7. [ ] For any failing component, check logs with `query_component_logs` immediately
-8. [ ] For GCP apps: ensure `DISABLE_PROFILER=1` is set on affected services
+1. [ ] Find pre-built image registry (GitHub releases, Docker Hub, GHCR, cloud registry)
+2. [ ] Fetch official Kubernetes/Helm manifests — extract env vars for every service
+3. [ ] Identify services with cloud-vendor SDK dependencies — note disable flags
+4. [ ] Identify optional service env vars — plan placeholder values
+5. [ ] Create project
+6. [ ] Create all components via `create_component` **without** `workflow` parameter
+7. [ ] Apply workloads via `occ apply` with: image, all env vars from manifests, connections
+8. [ ] Verify release binding status for each component
+9. [ ] For any failing component, check logs with `query_component_logs` immediately before assuming platform issue
 
 ---
 

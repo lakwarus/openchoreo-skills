@@ -168,47 +168,49 @@ patch_release_binding(namespace, project, component, env, patch) → patch bindi
 update_release_binding_state(namespace, project, component, env, active) → activate/deactivate
 ```
 
-### 9. Deploy a Third-Party App with Pre-built Images
+### 9. Deploy a Third-Party / Multi-Service App with Pre-built Images
 
-When the user asks you to deploy a well-known public app (e.g., Google microservices-demo, open-source stacks):
+When the user asks you to deploy a well-known public or open-source multi-service app:
 
 ```
-# 1. Find pre-built images — check the repo's release/ directory or README
-WebFetch or gh to fetch official kubernetes-manifests.yaml
-   → extract image URLs and env vars per service
+# 1. Find pre-built images — check release/ directory, README, CI pipelines
+WebFetch or gh to fetch official kubernetes-manifests.yaml (or Helm values, docker-compose)
+   → extract image URLs and ALL env vars per service
 
 # 2. Create project
-create_project(namespace, name)                             → project without pipeline or with default
+create_project(namespace, name)
 
 # 3. Create all components — NO workflow parameter
 create_component(namespace, project, name, componentType)   → repeat for each service
    componentType examples:
-     deployment/service        → backend gRPC/HTTP services
+     deployment/service         → backend gRPC/REST/TCP services
      deployment/web-application → public-facing frontend
-     deployment/worker          → background services (load generators, consumers)
-     statefulset/datastore      → databases, caches (Redis, etc.)
+     deployment/worker          → background workers, load generators
+     statefulset/datastore      → stateful stores (Redis, databases)
 
 # 4. Apply workloads in batch via occ apply
-# Write to /tmp/<app>-workloads.yaml and /tmp/<app>-workloads-connections.yaml
-# Apply simple workloads first, then workloads with connections
+# Batch 1: workloads without connections (simpler, fewer failure modes)
+# Batch 2: workloads with connections
 occ apply -f /tmp/<app>-workloads.yaml
 occ apply -f /tmp/<app>-workloads-connections.yaml
 
-# 5. Verify deployments
-list_release_bindings(namespace, component)  → repeat for each component; look for Ready vs ResourcesProgressing
+# 5. Verify each component
+list_release_bindings(namespace, component)  → Ready or ResourcesProgressing?
 
-# 6. Investigate any failures immediately
+# 6. Investigate any failing component immediately — before assuming platform issue
 query_component_logs(namespace, project, component, environment)
-   → look for crash-loop errors before assuming platform issue
+   → crash before "listening on port"? → vendor SDK crash, missing env var, or startup panic
+   → connection refused from another service? → dependency not yet ready or wrong port/env var
 ```
 
 **Key rules for this workflow:**
 
-- Never use `workflow` in `create_component` for BYO image deployments
-- Always apply env vars from the official manifests — connections alone are insufficient
-- GCP demo apps require `DISABLE_PROFILER=1` on Node.js and Python services or they crash-loop
-- Set optional missing service addresses (e.g., `SHOPPING_ASSISTANT_SERVICE_ADDR`) to a dummy value to prevent startup panics
+- Never set `workflow` in `create_component` for BYO image deployments
+- Always extract ALL env vars from official manifests — connections inject service addresses but not `PORT`, feature flags, or vendor SDK disable flags
+- If a service crash-loops before logging a "listening" message, look for a native module load error or vendor SDK init failure — apply the disable flag from the official manifests
+- If a required env var references an optional or not-yet-deployed service, set a placeholder value to prevent startup panics
 - `connections` must be a **list**, not a map — each entry needs a `name` field
+- Source builds fail for repos that use `ARG BUILDPLATFORM` multi-stage syntax (exit code 125) — switch to BYO immediately when you see this error
 
 ---
 
