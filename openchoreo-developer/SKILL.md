@@ -47,7 +47,7 @@ Read only the relevant reference file:
 
 - `references/concepts.md` for resource relationships and OpenChoreo concepts
 - `references/cli-reference.md` for `occ` install, setup, command behavior, and CLI gotchas
-- `references/deployment-guide.md` for BYOI, source builds, `workload.yaml`, connections, overrides, and deployment flow
+- `references/deployment-guide.md` for BYOI, source builds, `workload.yaml`, connections, overrides, deployment flow, and **deploying third-party/public apps with pre-built images**
 - `references/resource-schemas.md` for exact app-facing YAML shapes
 - `references/mcp-reference.md` for MCP tool usage: mapping developer workflows to both the control plane (`mcp__openchoreo-cp__*`) and observability (`mcp__openchoreo-obs__*`) MCP tools, tool quick reference, and MCP-specific gotchas — read this when operating through an MCP-connected AI agent instead of the CLI
 - `references/platform-engineer.md` when the task crosses into PE-managed capabilities or needs a clean escalation path
@@ -117,6 +117,10 @@ Keep these because they are durable and routinely useful:
 - Source-build Components use `spec.workflow`; `workload.yaml` belongs at the root of the selected `appPath`
 - Use ReleaseBinding status for the actual deployed URLs
 - When platform capabilities are missing or broken, escalate clearly or activate `openchoreo-platform-engineer`
+- **For third-party/public apps: default to pre-built images (BYO), not source builds.** Source builds commonly fail because third-party Dockerfiles use `ARG BUILDPLATFORM` multi-stage syntax that OpenChoreo's buildah builder does not support
+- **Before deploying any third-party app: fetch the official Kubernetes manifests** and extract every required env var per service — connections alone are never enough
+- **`create_component` without `workflow` for BYO image deployments** — adding a workflow to a BYO component causes unnecessary failed builds
+- **`connections` in workload spec is always an array, not a map** — each entry must include a `name` field
 
 ## Escalation rule
 
@@ -133,3 +137,7 @@ Route to `references/platform-engineer.md` before writing that escalation so it 
 - Reusing old examples without checking the current workflow and schema model
 - Guessing deployed URLs or route formats instead of reading ReleaseBinding status
 - Treating a platform-side failure as an app-only problem after `occ` evidence points elsewhere
+- Creating source-build components (with `workflow`) for third-party apps that have pre-built images — this always produces failed builds and clutters the UI
+- Omitting env vars from official Kubernetes manifests when deploying third-party apps — always fetch and apply the exact env vars the upstream manifests specify (e.g., `DISABLE_PROFILER=1`, `PORT`, feature flags)
+- Assuming a deployment is healthy because `status: Ready` without checking application logs — a crash-looping pod can still appear Ready briefly; always confirm with `query_component_logs`
+- Setting `connections` as a YAML map instead of an array — the API requires an array; each entry must have a `name` field

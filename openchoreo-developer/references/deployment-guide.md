@@ -628,6 +628,100 @@ For each service in the project:
 
 After changes, tell the user exactly what was modified and why, so they understand the pattern for future services.
 
+## Deploying Public Third-Party Apps (e.g., Google microservices-demo)
+
+When a user asks you to deploy a well-known open-source or Google-published app into OpenChoreo, follow this specialised path rather than the general source-build path.
+
+### Step 1 — Check whether pre-built images exist
+
+Before touching Dockerfiles or build workflows, look for official published images:
+
+- GitHub releases page or `release/` directory in the repo (e.g., `kubernetes-manifests.yaml`)
+- Docker Hub, Google Artifact Registry, GHCR
+- README or CI workflows that reference image registries
+
+If pre-built images exist, **always use BYO image path**. Do not attempt a source build. Source builds commonly fail for third-party repos because they use multi-platform Docker syntax (`ARG BUILDPLATFORM`) that OpenChoreo's buildah builder does not support.
+
+### Step 2 — Read the official Kubernetes manifests for required env vars
+
+The official Kubernetes manifests are the ground truth for what each service needs. Fetch them and extract:
+
+- Required env vars per service (ports, feature flags, service addresses)
+- `DISABLE_PROFILER`, `DISABLE_TRACING`, `DISABLE_STATS` flags
+- `PORT` env var values
+- Optional service addresses that must be set to prevent startup panics
+
+**Do not assume connections alone are sufficient.** Many services also need a `PORT` env var and GCP-specific feature flags.
+
+### Step 3 — Create components without workflows
+
+For BYO image deployments, call `create_component` **without** the `workflow` parameter. Adding a workflow forces a source build, clutters the UI with failed runs, and is entirely unnecessary when using pre-built images.
+
+```
+create_component(namespace, project, name, componentType)   ← no workflow param
+```
+
+### Step 4 — Create workloads with full env vars
+
+Apply workloads using `occ apply -f <file>` for batches. Each workload must include:
+
+1. The pre-built image
+2. All env vars from the official manifest (`PORT`, `DISABLE_PROFILER`, etc.)
+3. Connections for service-to-service communication (using `envBindings`)
+
+**`connections` is always an array, not a map:**
+
+```yaml
+connections:
+- name: redis                     # required name field
+  component: redis-cart
+  endpoint: redis
+  visibility: project
+  envBindings:
+    address: REDIS_ADDR
+```
+
+### Common env var patterns for GCP demo apps
+
+| Env var | Value | Affected services |
+|---------|-------|-------------------|
+| `DISABLE_PROFILER` | `"1"` | currencyservice, productcatalogservice, paymentservice, shippingservice, emailservice, recommendationservice |
+| `ENABLE_PROFILER` | `"0"` | frontend |
+| `PORT` | service-specific | All services — check official manifests |
+| `USERS` | `"10"` | loadgenerator |
+| `RATE` | `"1"` | loadgenerator |
+
+**Why DISABLE_PROFILER?** The Google demo images bundle `@google-cloud/profiler` (a native Node.js module). Outside GCP, the `pprof` native binary for `linux-x64-musl` is missing, causing the process to crash before the gRPC server starts. `DISABLE_PROFILER=1` skips the profiler load.
+
+### Optional/AI service addresses
+
+Some newer versions of demo apps reference optional services (e.g., `SHOPPING_ASSISTANT_SERVICE_ADDR` in the microservices-demo frontend). If the env var is required by the app but the service is not deployed:
+
+- Set the env var to a dummy address (e.g., `"shoppingassistantservice:80"`) so the container starts
+- The feature will fail gracefully at runtime when called
+
+### Multi-service deployment approach
+
+For 10+ service apps, batch workloads into YAML files and apply with `occ apply`:
+
+1. Write all workloads (without connections) to one file — apply first
+2. Write workloads with connections to a second file — apply second
+3. Verify with `list_release_bindings` per component
+4. For any service still failing, immediately check `query_component_logs` — don't assume it's a platform issue
+
+### Checklist for third-party app deployment
+
+1. [ ] Find pre-built image registry (GitHub releases, Docker Hub, GCR, GHCR)
+2. [ ] Fetch official Kubernetes manifests — extract env vars for every service
+3. [ ] Create a project (without workflow)
+4. [ ] Create all components via `create_component` without `workflow` parameter
+5. [ ] Create workloads via `occ apply` with: image, all env vars, connections
+6. [ ] Check release binding status for each component
+7. [ ] For any failing component, check logs with `query_component_logs` immediately
+8. [ ] For GCP apps: ensure `DISABLE_PROFILER=1` is set on affected services
+
+---
+
 ## End-to-End Deployment Checklist
 
 1. **Check CLI**: `occ version` (installed?)
