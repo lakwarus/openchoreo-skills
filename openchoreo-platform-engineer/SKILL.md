@@ -121,9 +121,9 @@ Keep these in mind because they are durable and high-value:
 
 - **Default to the `default` namespace.** Unless the user explicitly asks to create a new namespace, provision all environments, pipelines, and projects inside the existing `default` namespace. Always ask the user before creating a new namespace — new namespaces represent a significant organisational boundary and should be a conscious decision.
 - **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
-- `create_environment` and `create_deployment_pipeline` are not MCP tools — use `occ apply -f`. See `references/cli-and-resources.md` → Creating Platform Resources with occ.
+- `create_environment` and `create_deployment_pipeline` are not MCP tools. Environments use `occ apply -f`. Pipelines require `kubectl apply -f` due to an occ schema bug — see `references/cli-and-resources.md` → Create a DeploymentPipeline.
 - `occ` must be installed **and** logged in before any `occ apply` will work. See `references/cli-and-resources.md` → occ Installation and Login, or https://openchoreo.dev/docs/user-guide/cli-installation/. `occ login` with `service_mcp_client` does not work — use browser-based login.
-- `create_project` via MCP defaults to `deploymentPipelineRef: default` — use `occ apply -f` with the correct `deploymentPipelineRef` instead.
+- `create_project` via MCP supports a `deployment_pipeline` parameter — pass it explicitly to avoid defaulting to the `default` pipeline.
 - Upgrade order matters; do not move a remote plane ahead of the control plane.
 - Scope matters; cluster-scoped and namespace-scoped resources are not interchangeable.
 - `status.conditions`, live resource YAML, and current controller logs are better truth sources than memory.

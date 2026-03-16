@@ -60,7 +60,7 @@ For local setup, ensure `/etc/hosts` has entries for `api.openchoreo.localhost`,
 
 > **Prerequisite**: Complete occ Installation and Login above before running any command in this section. If `occ` is not installed or not logged in, these commands will fail.
 
-Once authenticated, use `occ apply -f` to create any platform resource. This covers operations not available as MCP tools (Environment, DeploymentPipeline, DataPlane, etc.).
+Use `occ apply -f` or `kubectl apply -f` to create platform resources not covered by MCP tools. See per-resource notes below — some resources have schema bugs that require `kubectl apply` instead of `occ apply`.
 
 > **Gotcha**: `occ apply -f -` (stdin) does not work — error: `path - does not exist`. Write YAML to a temp file first, then apply.
 
@@ -91,6 +91,8 @@ Set `isProduction: true` for production environments.
 
 ### Create a DeploymentPipeline
 
+> **Known bug**: `occ apply -f` fails for `DeploymentPipeline` — the occ client model and the API server schema disagree on whether `sourceEnvironmentRef` is a plain string or an object. Use **`kubectl apply -f`** instead.
+
 ```bash
 cat > /tmp/pipeline.yaml <<'EOF'
 apiVersion: openchoreo.dev/v1alpha1
@@ -98,6 +100,8 @@ kind: DeploymentPipeline
 metadata:
   name: foo-pipeline
   namespace: default
+  labels:
+    openchoreo.dev/name: foo-pipeline
   annotations:
     openchoreo.dev/display-name: Foo Pipeline
     openchoreo.dev/description: "development → qa → production"
@@ -112,23 +116,39 @@ spec:
         - name: production
           requiresApproval: false
 EOF
+kubectl apply -f /tmp/pipeline.yaml   # use kubectl, not occ apply
 ```
+
+> **Important**: The `openchoreo.dev/name` label must be set on the pipeline metadata or it may not be discoverable via the API.
 
 ### Create or Update a Project
 
+> **Preferred**: Use the `create_project` MCP tool — it now accepts a `deployment_pipeline` parameter so the correct pipeline can be set at creation time without needing `occ apply`.
+
+```
+create_project(namespace, name, deployment_pipeline="foo-pipeline")
+```
+
+If you need to use `occ apply` instead (e.g. to add display name / description annotations):
+
 ```bash
-cat <<EOF | occ apply -f -
+cat > /tmp/project.yaml <<'EOF'
 apiVersion: openchoreo.dev/v1alpha1
 kind: Project
 metadata:
   name: foo
   namespace: default
+  labels:
+    openchoreo.dev/name: foo
+  annotations:
+    openchoreo.dev/display-name: Foo
 spec:
   deploymentPipelineRef: foo-pipeline   # plain string, not an object
 EOF
+occ apply -f /tmp/project.yaml
 ```
 
-> **Note**: `create_project` via MCP always defaults to `deploymentPipelineRef: default`. Use `occ apply` when you need a specific pipeline assigned at creation time.
+> **Note (legacy)**: Older versions of the `create_project` MCP tool always defaulted to `deploymentPipelineRef: default`. In current versions, pass `deployment_pipeline` explicitly.
 
 ### Verify after applying
 

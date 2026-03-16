@@ -2,11 +2,12 @@
 
 This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
-> **Note on platform resource management**: The following operations are **not available as MCP tools** — use `occ apply -f` instead (see `cli-and-resources.md` → Creating Platform Resources with occ):
-> - `create_environment` / `get_environment` / `create_deployment_pipeline`
-> - DataPlane, BuildPlane, ObservabilityPlane CRUD
+> **Note on platform resource management**:
+> - `create_environment` — no MCP tool; use `occ apply -f`
+> - `create_deployment_pipeline` — no MCP tool; use **`kubectl apply -f`** (occ apply has a schema bug for this resource type — see `cli-and-resources.md`)
+> - DataPlane, BuildPlane, ObservabilityPlane CRUD — no MCP tools; use `occ apply -f` or `kubectl apply -f`
 >
-> Projects created via `create_project` MCP default to `deploymentPipelineRef: default`. Use `occ apply -f` to create the project with the correct pipeline, or reapply after creation.
+> `create_project` MCP now accepts a `deployment_pipeline` parameter — always pass it explicitly to avoid defaulting to `deploymentPipelineRef: default`.
 
 ## Tool Quick Reference
 
