@@ -25,33 +25,27 @@ This document maps developer workflows to the `mcp__openchoreo-cp__*` (control p
 | `list_cluster_traits` | `occ clustertrait list` | List cluster-scoped traits |
 | `get_cluster_trait` | `occ clustertrait get <name>` | Get cluster trait |
 | `get_cluster_trait_schema` | `occ clustertrait get <name>` | Get cluster trait schema |
-| `list_workflows` | `occ workflow list` | List available build workflow templates |
+| `list_workflows` | `occ workflow list` | List namespace-scoped build workflow templates |
 | `get_workflow_schema` | `occ workflow get <name>` | Get workflow template schema |
-| `create_workflow_run` | `occ component workflow run` | Create (queue) a workflow run |
-| `trigger_workflow_run` | `occ component workflow run <name>` | Trigger a build/workflow run |
+| `list_cluster_workflows` | `occ clusterworkflow list` | List cluster-scoped workflow templates |
+| `get_cluster_workflow` | `occ clusterworkflow get <name>` | Get full cluster workflow spec |
+| `get_cluster_workflow_schema` | `occ clusterworkflow get <name>` | Get cluster workflow parameter schema |
+| `create_workflow_run` | `occ component workflow run` | Create (queue) a workflow run with explicit parameters |
+| `trigger_workflow_run` | `occ component workflow run <name>` | Trigger a build/workflow run for a component |
 | `get_workflow_run` | `occ component workflowrun get <name>` | Get a specific workflow run |
 | `list_workflow_runs` | `occ component workflowrun list` | List workflow run history |
-| `list_component_releases` | `occ componentrelease list` | List component releases |
-| `get_component_release` | `occ componentrelease get <name>` | Get release details |
-| `get_component_release_schema` | — | Get component release schema |
-| `create_component_release` | `occ componentrelease generate` | Create a component release |
-| `create_workload` | `occ workload create` | Create a workload for a component |
-| `update_workload` | `occ apply -f workload.yaml` (update) | Update an existing workload |
+| `create_workload` | `occ workload create` | Create a workload for a BYO-image component |
+| `update_workload` | `occ apply -f workload.yaml` (update) | Update an existing workload (source-build components) |
 | `get_workload` | `occ workload get <name>` | Get workload details |
 | `get_workload_schema` | — | Get workload YAML schema |
 | `list_workloads` | `occ workload list --component <name>` | List workloads for a component |
 | `list_environments` | `occ environment list` | List environments |
-| `get_environment` | `occ environment get <name>` | Get environment details |
-| `get_environment_release` | — | Get release deployed in an environment |
 | `list_deployment_pipelines` | `occ deploymentpipeline list` | List deployment pipelines |
 | `get_deployment_pipeline` | `occ deploymentpipeline get <name>` | Get deployment pipeline details |
-| `deploy_release` | `occ component deploy <name>` | Deploy a release to root environment |
-| `promote_component` | `occ component deploy --to <env>` | Promote component to next environment |
 | `list_release_bindings` | `occ releasebinding list` | List release bindings |
 | `get_release_binding` | `occ releasebinding get <name>` | Get a specific release binding |
-| `patch_release_binding` | `occ apply -f releasebinding.yaml` (update) | Patch a release binding |
-| `update_release_binding_state` | — | Activate or deactivate a release binding |
-| `get_observer_url` | — | Get observability URL for a component |
+| `patch_release_binding` | `occ apply -f releasebinding.yaml` (update) | Patch a release binding (overrides, env, release) |
+| `update_release_binding_state` | — | Set release binding state: `Active` or `Undeploy` |
 | `list_secret_references` | `occ secretreference list` | List secret references |
 
 ## Observability Tool Quick Reference
@@ -76,10 +70,11 @@ These tools use the `mcp__openchoreo-obs__*` server and are the primary way to q
 list_namespaces              → find available namespaces
 list_projects(namespace)     → find projects
 list_environments(namespace) → find environments and their states
-list_component_types(namespace)         → what types can I deploy?
-list_cluster_component_types(namespace) → cluster-wide types?
-list_cluster_traits(namespace)          → what traits are available?
-list_workflows(namespace)               → what build workflows exist?
+list_component_types(namespace)         → namespace-scoped types
+list_cluster_component_types            → cluster-wide types (most common)
+list_cluster_traits                     → what traits are available?
+list_workflows(namespace)               → namespace-scoped workflow templates
+list_cluster_workflows                  → cluster-scoped workflow templates
 ```
 
 ### 2. Scaffold and Create a Component
@@ -109,25 +104,28 @@ trigger_workflow_run(namespace, project, component)     → kick off a build
 get_workflow_run(namespace, project, component, run_id) → check run status
 ```
 
-### 4. Deploy and Promote
+### 4. Activate and Manage Deployments
+
+After a build completes, release bindings are created automatically (or on first `create_workload` for BYO). Use these tools to inspect and control deployment state:
 
 ```
-list_component_releases(namespace, project, component) → find available releases
-deploy_release(namespace, project, component, release)  → deploy to root environment
-get_environment_release(namespace, environment)         → confirm what's deployed
-promote_component(namespace, project, component, target_env) → promote to next env
+list_release_bindings(namespace, project, component)           → see binding per environment
+get_release_binding(namespace, binding_name)                   → inspect status, endpoints, state
+update_release_binding_state(namespace, binding_name, Active)  → activate a deployment
+update_release_binding_state(namespace, binding_name, Undeploy)→ undeploy from an environment
+patch_release_binding(namespace, binding_name, overrides)      → update env overrides or release ref
 ```
+
+> **Note**: There are no MCP tools for `deploy_release` or `promote_component`. Promotion to a downstream environment is done via `occ apply -f releasebinding.yaml` with the target environment, or by patching the release binding's `environment` field.
 
 ### 5. Inspect and Debug
 
 ```
 get_component(namespace, project, component)            → spec + status conditions
 list_workloads(namespace, project, component)           → running workloads
-get_workload(namespace, project, component, workload)   → workload details
+get_workload(namespace, workload_name)                  → workload details
 list_release_bindings(namespace, project, component)    → binding per environment
-get_release_binding(namespace, project, component, env) → binding for a specific env
-get_environment_release(namespace, environment)         → what release is live
-get_observer_url(namespace, project, component)         → observability UI link
+get_release_binding(namespace, binding_name)            → binding status, endpoints, invokeURL
 list_secret_references(namespace)                       → available secrets
 ```
 
@@ -223,10 +221,12 @@ When working with an unfamiliar cluster, always explore in this order:
 2. list_projects(namespace)
 3. list_environments(namespace)
 4. list_deployment_pipelines(namespace)
-5. list_cluster_component_types(namespace)
-6. list_cluster_traits(namespace)
-7. list_workflows(namespace)
-8. list_components(namespace, project)
+5. list_cluster_component_types         → cluster-wide types (most common)
+6. list_component_types(namespace)      → namespace-scoped types (if any)
+7. list_cluster_traits                  → cluster-wide traits
+8. list_cluster_workflows               → cluster-scoped build workflows
+9. list_workflows(namespace)            → namespace-scoped workflows (if any)
+10. list_components(namespace, project) → components already deployed
 ```
 
 ## Common Gotchas
@@ -237,11 +237,11 @@ When working with an unfamiliar cluster, always explore in this order:
 
 **`list_release_bindings` requires a component**: You must pass both project and component name, not just project.
 
-**`deploy_release` vs `promote_component`**: Use `deploy_release` for initial deployment to the root environment. Use `promote_component` to advance to higher environments.
+**No `deploy_release` or `promote_component` MCP tools**: Deployment state is managed via `update_release_binding_state` (Active/Undeploy) and `patch_release_binding`. To promote to a downstream environment, use `occ apply -f releasebinding.yaml` with the target environment set.
 
 **`get_workload_schema` before writing workload YAML**: Call `get_workload_schema` to explore available fields rather than guessing. The `connections` field is an array of objects, not a map.
 
-**`trigger_workflow_run` vs `create_workflow_run`**: `trigger_workflow_run` starts an immediate run. `create_workflow_run` queues a run with explicit configuration. Check the schema for each to confirm parameters.
+**`trigger_workflow_run` vs `create_workflow_run`**: `trigger_workflow_run` starts a build for a component using its configured workflow and parameters (pass optional `commit` SHA to pin to a revision). `create_workflow_run` creates a standalone run by workflow name with explicit parameters — use for workflows not tied to a component.
 
 **Workflow runs can lag**: A just-triggered workflow may briefly show no runs. Call `list_workflow_runs` after a moment, then verify with `get_component`.
 
@@ -249,6 +249,6 @@ When working with an unfamiliar cluster, always explore in this order:
 
 **`connections` must be an array, not a map**: `get_workload_schema` may report connections as a JSON object. The API requires an array of connection objects: `[{"component": "...", "endpoint": "...", "visibility": "project", "envBindings": {"address": "ENV_VAR"}}]`.
 
-**Use `query_component_logs` before `get_observer_url`**: For quick log triage in the AI assistant, `query_component_logs` is faster than opening the UI link. Use the URL when you need the full dashboard.
+**Use `query_component_logs` for quick triage**: `query_component_logs` is the fastest way to check runtime logs from the AI assistant. `query_workflow_logs` covers build/CI logs. Use the Backstage UI for the full dashboard.
 
 **Observability data requires a live ObservabilityPlane**: If queries return no data, confirm the ObservabilityPlane is registered and healthy — escalate to `openchoreo-platform-engineer` if needed.

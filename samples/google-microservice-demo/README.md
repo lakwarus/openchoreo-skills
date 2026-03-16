@@ -13,7 +13,7 @@ This sample shows how to deploy the [Google Cloud Platform Online Boutique (micr
 - Port remapping (emailservice svc:5000 → container:8080)
 - `worker` ComponentType for the Locust load generator
 - External HTTP exposure of the frontend via `visibility: [external]`
-- Discovering and working around MCP tool bugs at runtime
+- Discovering and working around MCP tool limitations at runtime (bugs noted below are fixed in current MCP server)
 
 ---
 
@@ -24,7 +24,7 @@ This sample shows how to deploy the [Google Cloud Platform Online Boutique (micr
 | Claude Code with skills loaded | Both `openchoreo-developer` and `openchoreo-platform-engineer` from this repo |
 | `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/) |
 | OpenChoreo v0.17 cluster | With at least one DataPlane, `development` environment, and the `service` / `web-application` / `worker` ComponentTypes registered |
-| Access to the OpenChoreo REST API | Used as a fallback when the `create_workload` MCP tool fails (see Known Issues) |
+| Access to the OpenChoreo REST API | Optional fallback; `create_workload` MCP tool is now fixed in current versions |
 
 ---
 
@@ -115,22 +115,26 @@ Each tier: create Component → create Workload → verify `status: Ready`.
 | Deployment time (first component → all Ready) | ~9 min 22 sec |
 | Sub-agent tokens (repo research) | 13,526 |
 | Main session tool uses | ~75 |
-| MCP tool bugs encountered | 2 (see below) |
+| MCP tool bugs encountered | 2 (see below — both fixed in current MCP server) |
 
 ---
 
 ## Known issues and workarounds discovered during this run
 
-### 1. `create_workload` MCP tool — missing workload name derivation
+> **Status:** Both issues below have been fixed in the current MCP server. `create_workload` now works correctly. The `connections` must still be an array (issue #2 was a documentation/schema bug, not a runtime bug).
 
-**Symptom:** Every call to `mcp__openchoreo-cp__create_workload` fails with:
+### 1. `create_workload` MCP tool — missing workload name derivation *(fixed)*
+
+**Symptom (at time of this run):** Every call to `mcp__openchoreo-cp__create_workload` failed with:
 ```
 failed to check workload existence: checking existence of workload default/: resource name may not be empty
 ```
 
-**Root cause:** The MCP tool's server-side handler does not derive the workload name from `component_name` before checking for an existing workload. The tool schema is also missing `project_name`.
+**Root cause:** The MCP tool's server-side handler did not derive the workload name from `component_name` before checking for an existing workload.
 
-**Workaround:** Call the OpenChoreo REST API directly:
+**Current behavior:** Fixed. Use `create_workload` directly — no REST API workaround needed. The tool now accepts `namespace_name`, `component_name`, and `workload_spec`.
+
+**Legacy workaround (for older server versions):** Call the OpenChoreo REST API directly:
 
 ```bash
 TOKEN=$(curl -k -s -X POST "$AUTH_URL/oauth2/token" \
@@ -151,11 +155,6 @@ curl -s -X POST "$API_BASE/api/v1/namespaces/default/workloads" \
     }
   }'
 ```
-
-Key points:
-- `metadata.name` must be set explicitly (use the component name)
-- `spec.owner.projectName` must be set
-- `connections` is an **array** (see issue #2)
 
 ### 2. `get_workload_schema` — connections reported as map, API expects array
 

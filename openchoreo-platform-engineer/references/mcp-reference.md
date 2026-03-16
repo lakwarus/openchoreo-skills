@@ -3,7 +3,7 @@
 This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (control plane) and `mcp__openchoreo-obs__*` (observability) MCP tools available via Claude Code. Use these instead of the `occ` CLI when working through an AI assistant.
 
 > **Note on platform resource management**: The following operations are **not available as MCP tools** — use `occ apply -f` instead (see `cli-and-resources.md` → Creating Platform Resources with occ):
-> - `create_environment` / `create_deployment_pipeline`
+> - `create_environment` / `get_environment` / `create_deployment_pipeline`
 > - DataPlane, BuildPlane, ObservabilityPlane CRUD
 >
 > Projects created via `create_project` MCP default to `deploymentPipelineRef: default`. Use `occ apply -f` to create the project with the correct pipeline, or reapply after creation.
@@ -15,8 +15,6 @@ This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (c
 | `list_namespaces` | `occ namespace list` | List namespaces |
 | `create_namespace` | `occ apply -f namespace.yaml` | Create a namespace |
 | `list_environments` | `occ environment list` | List environments |
-| `get_environment` | `occ environment get <name>` | Get environment details |
-| `get_environment_release` | — | Check what release is deployed in an env |
 | `list_deployment_pipelines` | `occ deploymentpipeline list` | List deployment pipelines |
 | `get_deployment_pipeline` | `occ deploymentpipeline get <name>` | Get deployment pipeline details |
 | `list_component_types` | `occ componenttype list` | List namespace-scoped component types |
@@ -29,8 +27,11 @@ This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (c
 | `list_cluster_traits` | `occ clustertrait list` | List cluster-scoped traits |
 | `get_cluster_trait` | `occ clustertrait get <name>` | Get cluster trait |
 | `get_cluster_trait_schema` | `occ clustertrait get <name>` | Get cluster trait full schema |
-| `list_workflows` | `occ workflow list` | List build workflow templates |
+| `list_workflows` | `occ workflow list` | List namespace-scoped build workflow templates |
 | `get_workflow_schema` | `occ workflow get <name>` | Get workflow template schema |
+| `list_cluster_workflows` | `occ clusterworkflow list` | List cluster-scoped workflow templates |
+| `get_cluster_workflow` | `occ clusterworkflow get <name>` | Get full cluster workflow spec |
+| `get_cluster_workflow_schema` | `occ clusterworkflow get <name>` | Get cluster workflow parameter schema |
 | `list_projects` | `occ project list` | List projects |
 | `create_project` | `occ apply -f project.yaml` | Create a project |
 | `list_components` | `occ component list` | List components (for inspection) |
@@ -41,14 +42,11 @@ This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (c
 | `get_workload_schema` | — | Get workload YAML schema |
 | `list_workflow_runs` | `occ component workflowrun list` | List workflow runs |
 | `get_workflow_run` | `occ component workflowrun get <name>` | Get a specific workflow run |
-| `list_component_releases` | `occ componentrelease list` | List component releases |
-| `get_component_release` | `occ componentrelease get <name>` | Get release details |
 | `list_release_bindings` | `occ releasebinding list` | List component release bindings |
 | `get_release_binding` | `occ releasebinding get <name>` | Get a specific release binding |
 | `patch_release_binding` | `occ apply -f releasebinding.yaml` (update) | Patch a release binding |
-| `update_release_binding_state` | — | Activate or deactivate a release binding |
+| `update_release_binding_state` | — | Set release binding state: `Active` or `Undeploy` |
 | `list_secret_references` | `occ secretreference list` | List secret references |
-| `get_observer_url` | — | Get observability URL for a component |
 
 ## Observability Tool Quick Reference
 
@@ -319,11 +317,14 @@ get_cluster_trait_schema(namespace, name)   → see full schema with patches
 
 ### 5. Register Workflow Templates
 
-Build workflow templates define how components are built:
+Build workflow templates define how components are built. Both cluster-scoped and namespace-scoped variants are supported:
 
 ```
-list_workflows(namespace)              → what workflows exist?
-get_workflow_schema(namespace, name)   → inspect a workflow template
+list_cluster_workflows                        → cluster-scoped templates (shared across namespaces)
+get_cluster_workflow(cwf_name)               → inspect full cluster workflow spec
+get_cluster_workflow_schema(cwf_name)        → inspect parameter schema
+list_workflows(namespace)                    → namespace-scoped templates
+get_workflow_schema(namespace, name)         → inspect namespace workflow schema
 ```
 
 Register new workflows via `occ apply` (preferred) or the REST API.
@@ -335,11 +336,10 @@ list_projects(namespace)                              → what projects exist?
 list_components(namespace, project)                   → what components are deployed?
 get_component(namespace, project, component)          → inspect spec and status conditions
 list_environments(namespace)                          → what environments are active?
-get_environment_release(namespace, env)               → what release is live per env?
 list_release_bindings(namespace, project, component)  → binding per environment
-get_release_binding(namespace, project, component, env) → binding for a specific env
+get_release_binding(namespace, binding_name)          → binding status, endpoints, state
 list_workloads(namespace, project, component)         → running workloads
-get_workload(namespace, project, component, workload) → workload spec and status
+get_workload(namespace, workload_name)                → workload spec and status
 list_secret_references(namespace)                     → available secrets
 ```
 
@@ -364,10 +364,12 @@ When connecting to a new cluster, explore infrastructure state in this order:
 1. list_namespaces
 2. list_environments(namespace)
 3. list_deployment_pipelines(namespace)
-4. list_cluster_component_types(namespace)
-5. list_cluster_traits(namespace)
-6. list_workflows(namespace)
-7. list_projects(namespace)
+4. list_cluster_component_types          → cluster-scoped types (most common)
+5. list_component_types(namespace)       → namespace-scoped types (if any)
+6. list_cluster_traits                   → cluster-scoped traits
+7. list_cluster_workflows                → cluster-scoped build workflow templates
+8. list_workflows(namespace)             → namespace-scoped workflows (if any)
+9. list_projects(namespace)
 ```
 
 For plane resources not exposed by MCP, try the REST API first:
@@ -394,7 +396,7 @@ Fall back to `kubectl` only if the REST API does not expose the resource.
 
 **Namespace-scoped vs cluster-scoped**: `DataPlane`/`BuildPlane`/`ObservabilityPlane` come in both namespace-scoped and cluster-scoped (`ClusterDataPlane`, etc.) variants. Use cluster-scoped for shared infrastructure; namespace-scoped for tenant isolation.
 
-**Status conditions are your debug tool**: `get_environment`, `get_component`, and `get_workload` all return `status.conditions`. Check `reason` and `message` fields for any resource that isn't `Ready`.
+**Status conditions are your debug tool**: `get_component` and `get_workload` return `status.conditions`. Check `reason` and `message` fields for any resource that isn't `Ready`. For environment status, use `occ environment get <name>` (no MCP `get_environment` tool).
 
 **Inspect component type schema before authoring component YAML**: Call `get_cluster_component_type_schema` to discover required fields. Do not guess component type shapes.
 
