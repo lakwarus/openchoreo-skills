@@ -116,7 +116,7 @@ Each pipeline encodes the full promotion path including `requiresApproval` polic
 
 ### Phase 5 — Create projects with correct pipeline assignment
 
-Projects are created via `occ apply` (not the MCP `create_project` tool) because the MCP tool always defaults to `deploymentPipelineRef: default` — a known limitation. Using `occ apply` ensures the correct pipeline is assigned at creation time:
+Projects are created via `occ apply` or via the MCP `create_project` tool with the `deployment_pipeline` parameter. Using `occ apply` gives full control over the pipeline assignment at creation time:
 
 ```bash
 # payments-service project → payments-service-pipeline
@@ -273,11 +273,9 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: integration
-          requiresApproval: false
     - sourceEnvironmentRef: integration
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: false
 ```
 
 ### pipeline-customer-portal.yaml
@@ -296,15 +294,12 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: staging
-          requiresApproval: false
     - sourceEnvironmentRef: staging
       targetEnvironmentRefs:
         - name: uat
-          requiresApproval: false
     - sourceEnvironmentRef: uat
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: false
 ```
 
 ### project-payments-service.yaml
@@ -319,7 +314,9 @@ metadata:
     openchoreo.dev/display-name: Payments Service
     openchoreo.dev/description: Payments service team project
 spec:
-  deploymentPipelineRef: payments-service-pipeline
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: payments-service-pipeline
 ```
 
 ### project-customer-portal.yaml
@@ -334,7 +331,9 @@ metadata:
     openchoreo.dev/display-name: Customer Portal
     openchoreo.dev/description: Customer portal team project
 spec:
-  deploymentPipelineRef: customer-portal-pipeline
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: customer-portal-pipeline
 ```
 
 ---
@@ -343,7 +342,7 @@ spec:
 
 ### Why occ apply instead of MCP create_project?
 
-The `create_project` MCP tool always assigns `deploymentPipelineRef: default` regardless of what you pass. This is a known limitation. Using `occ apply -f` gives full control over `spec.deploymentPipelineRef` at creation time.
+The `create_project` MCP tool accepts a `deployment_pipeline` parameter — pass it explicitly to avoid defaulting to `default`. Alternatively, use `occ apply -f` for full control over the YAML including display names and descriptions.
 
 ### Why occ apply instead of MCP for environments and pipelines?
 

@@ -19,7 +19,7 @@ Every controlplane namespace needs a minimum set of resources before developers 
 ```bash
 export NAMESPACE_NAME="<your-namespace>"
 kubectl create namespace $NAMESPACE_NAME
-kubectl label namespace $NAMESPACE_NAME openchoreo.dev/controlplane-namespace=true
+kubectl label namespace $NAMESPACE_NAME openchoreo.dev/control-plane=true
 ```
 
 The label is what tells controllers to reconcile resources in this namespace.
@@ -123,11 +123,9 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: staging
-          requiresApproval: false
     - sourceEnvironmentRef: staging
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: true
 EOF
 ```
 
@@ -145,25 +143,27 @@ metadata:
   labels:
     openchoreo.dev/name: default
 spec:
-  deploymentPipelineRef: default
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: default
 EOF
 ```
 
-`deploymentPipelineRef` is a plain string, not an object.
+`deploymentPipelineRef` is now an object with `kind` and `name` fields (changed in v1.0.0-rc.1).
 
-### Optional: Register BuildPlane and ObservabilityPlane
+### Optional: Register WorkflowPlane and ObservabilityPlane
 
 Same pattern as DataPlane: extract agent CA, create the CR with `clusterAgent.clientCA.value`.
 
 ```bash
-# BuildPlane
-BP_CA_CERT=$(kubectl --context ${BUILD_PLANE_CONTEXT} get secret cluster-agent-tls \
-  -n openchoreo-build-plane \
+# WorkflowPlane (formerly BuildPlane)
+WP_CA_CERT=$(kubectl --context ${WORKFLOW_PLANE_CONTEXT} get secret cluster-agent-tls \
+  -n openchoreo-workflow-plane \
   -o jsonpath='{.data.ca\.crt}' | base64 -d)
 
 kubectl apply -f - <<EOF
 apiVersion: openchoreo.dev/v1alpha1
-kind: BuildPlane
+kind: WorkflowPlane
 metadata:
   name: default
   namespace: $NAMESPACE_NAME
@@ -172,7 +172,7 @@ spec:
   clusterAgent:
     clientCA:
       value: |
-$(echo "$BP_CA_CERT" | sed 's/^/        /')
+$(echo "$WP_CA_CERT" | sed 's/^/        /')
   secretStoreRef:
     name: default
 EOF
@@ -302,7 +302,7 @@ kubectl --context $DP_CONTEXT logs -n openchoreo-data-plane -l app=cluster-agent
 # Should show "connected to control plane"
 ```
 
-Same pattern applies for BuildPlane and ObservabilityPlane agents.
+Same pattern applies for WorkflowPlane and ObservabilityPlane agents.
 
 ### Telemetry in multi-cluster
 
@@ -319,7 +319,7 @@ Data and Build plane exporters point to the Observability Plane's external endpo
 1. Review release notes for the target version
 2. Back up resources:
    ```bash
-   kubectl get organizations,projects,components,dataplanes,buildplanes -A -o yaml > openchoreo-backup.yaml
+   kubectl get organizations,projects,components,dataplanes,workflowplanes -A -o yaml > openchoreo-backup.yaml
    ```
 3. Test in non-production first
 
@@ -343,11 +343,11 @@ helm upgrade openchoreo-data-plane \
   --namespace openchoreo-data-plane \
   --reuse-values
 
-# Build Plane (if installed)
-helm upgrade openchoreo-build-plane \
-  oci://ghcr.io/openchoreo/helm-charts/openchoreo-build-plane \
+# Workflow Plane (if installed; chart renamed from openchoreo-build-plane in v1.0.0-rc.1)
+helm upgrade openchoreo-workflow-plane \
+  oci://ghcr.io/openchoreo/helm-charts/openchoreo-workflow-plane \
   --version <version> \
-  --namespace openchoreo-build-plane \
+  --namespace openchoreo-workflow-plane \
   --reuse-values
 
 # Observability Plane (if installed)
@@ -380,6 +380,6 @@ helm rollback openchoreo-control-plane -n openchoreo-control-plane
 
 | OpenChoreo | Kubernetes | Helm |
 |-----------|-----------|------|
+| 1.0.0-rc.1 | 1.32+ | 3.12+ |
 | 0.7.x | 1.32+ | 3.12+ |
 | 0.6.x | 1.31+ | 3.12+ |
-| 0.5.x | 1.30+ | 3.12+ |

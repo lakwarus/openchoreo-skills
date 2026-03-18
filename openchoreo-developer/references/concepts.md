@@ -18,11 +18,12 @@ Namespace (tenant boundary)
 
 Platform-managed (read-only for developers):
   ├── DataPlane (runtime cluster)
-  ├── BuildPlane (CI/build cluster)
+  ├── WorkflowPlane (CI/build cluster, formerly BuildPlane)
   ├── ObservabilityPlane (logging)
   ├── ComponentType / ClusterComponentType (deployment templates)
   ├── Trait / ClusterTrait (composable capabilities)
-  └── Workflow (build/automation templates)
+  ├── Workflow / ClusterWorkflow (build/automation templates)
+  └── RenderedRelease (rendered deployment artifact on DataPlane)
 ```
 
 ## Core Abstractions
@@ -53,7 +54,7 @@ The runtime contract. Defines what image to run, what ports to expose, and what 
 **Key fields**:
 - `container`: image, command, args, env vars, files
 - `endpoints`: Named network interfaces with type and visibility
-- `connections`: Dependencies on other services with automatic env var injection
+- `dependencies`: Dependencies on other services with automatic env var injection (formerly `connections`)
 
 ### Workload Descriptor
 A `workload.yaml` file placed in your source repository that tells the build workflow what endpoints, connections, and configurations your service has. The build process reads this and generates a proper Workload CR.
@@ -98,15 +99,15 @@ A deployment target (dev, staging, prod). Maps to a DataPlane (Kubernetes cluste
 ### DeploymentPipeline
 Defines promotion paths between environments. A pipeline might be: development -> staging -> production.
 
-**Important**: `deploymentPipelineRef` in Project spec is a plain string, not an object.
+**Important**: `deploymentPipelineRef` in Project spec is now an object with `kind` and `name` fields (changed in v1.0.0-rc.1 — previously a plain string).
 ```yaml
-# Correct
-deploymentPipelineRef: default
-
-# Wrong - will fail with unmarshal error
+# Correct (v1.0.0-rc.1+)
 deploymentPipelineRef:
   kind: DeploymentPipeline
   name: default
+
+# Wrong - plain string no longer accepted
+deploymentPipelineRef: default
 ```
 
 ### ComponentRelease
@@ -115,7 +116,7 @@ Immutable snapshot of Component + Workload + ComponentType + Traits at a point i
 ### ReleaseBinding
 Binds a ComponentRelease to an Environment. This is what triggers actual deployment. Supports environment-specific overrides:
 - `componentTypeEnvOverrides`: Replicas, resource limits, etc.
-- `traitOverrides`: Per-environment trait values keyed by trait instanceName
+- `traitEnvironmentConfigs`: Per-environment trait values keyed by trait instanceName (renamed from `traitOverrides` in v1.0.0-rc.1)
 - `workloadOverrides`: Extra env vars, files for specific environments
 - `state`: `Active` (running) or `Undeploy` (removed)
 
@@ -142,7 +143,7 @@ As a developer, you control this through endpoint `visibility` on Workloads. The
 ## Deployment Flow
 
 ```
-Component -> Workload -> ComponentRelease -> ReleaseBinding -> Release (on DataPlane)
+Component -> Workload -> ComponentRelease -> ReleaseBinding -> RenderedRelease (on DataPlane)
 ```
 
 1. Define Component (what to deploy, which type)
@@ -159,7 +160,7 @@ These are platform-engineer managed. Developers see them as read-only.
 
 - **Control Plane**: Runs OpenChoreo controllers and API server
 - **Data Plane**: Runs application workloads (can be multiple clusters)
-- **Build Plane**: Runs CI/CD builds (Argo Workflows)
+- **WorkflowPlane**: Runs CI/CD builds (Argo Workflows; formerly called Build Plane)
 - **Observability Plane**: Centralized logging (OpenSearch + Fluentbit)
 
 ## API Version
@@ -168,10 +169,10 @@ All OpenChoreo resources use: `apiVersion: openchoreo.dev/v1alpha1`
 
 ## Inter-service Communication
 
-Services within the same project can talk freely. For cross-project communication or formalized connections, use the Workload `connections` field instead of hardcoding URLs. The platform resolves service addresses and injects them as environment variables.
+Services within the same project can talk freely. For cross-project communication or formalized connections, use the Workload `dependencies` field instead of hardcoding URLs. The platform resolves service addresses and injects them as environment variables.
 
 ```yaml
-connections:
+dependencies:
   - component: backend-api
     endpoint: api
     visibility: project

@@ -101,7 +101,7 @@ traits:
 
 ```yaml
 spec:
-  traitOverrides:
+  traitEnvironmentConfigs:
     high-error-rate:
       enabled: true
       enableAiRootCauseAnalysis: false

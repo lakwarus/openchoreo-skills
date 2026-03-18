@@ -112,7 +112,7 @@ Trait parameters can be overridden per environment via ReleaseBinding:
 
 ```yaml
 spec:
-  traitOverrides:
+  traitEnvironmentConfigs:
     my-api-config:
       rateLimiting:
         requestsPerUnit: 600    # production override

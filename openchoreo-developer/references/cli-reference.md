@@ -8,19 +8,19 @@ The `occ` CLI manages OpenChoreo resources.
 
 ```bash
 # macOS Apple Silicon (ARM64)
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_darwin_arm64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 # macOS Intel (AMD64)
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_darwin_amd64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 # Linux x64
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_amd64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_linux_amd64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 # Linux ARM64
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_arm64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_linux_arm64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 ```
 
@@ -84,21 +84,22 @@ Unlike kubectl, occ has no `--output` / `-o` flag. `occ <resource> get <name>` a
 | `component` | `comp` | list, get, delete, scaffold, deploy, logs, workflow run/logs, workflowrun list/logs |
 | `environment` | `env` | list, get, delete |
 | `dataplane` | `dp` | list, get, delete |
-| `buildplane` | `bp` | list, get, delete |
+| `workflowplane` | `wp` | list, get, delete |
 | `observabilityplane` | `op` | list, get, delete |
 | `deploymentpipeline` | `deppipe` | list, get, delete |
 | `componenttype` | `ct` | list, get, delete |
 | `clustercomponenttype` | `cct` | list, get, delete |
 | `trait` | `traits` | list, get, delete |
 | `clustertrait` | `clustertraits` | list, get, delete |
-| `workflow` | `wf` | list, get, run, logs |
+| `workflow` | `wf` | list, get, delete, run, logs |
+| `clusterworkflow` | `cwf` | apply, list, get, delete, run, logs |
 | `workflowrun` | `wr` | list, get, logs |
 | `secretreference` | `sr` | list, get, delete |
 | `workload` | `wl` | create, list, get, delete |
 | `componentrelease` | - | generate (fs-mode), list, get |
 | `releasebinding` | - | generate (fs-mode), list, get, delete |
-| `authzclusterrole` | `cr` | list, get, delete |
-| `authzclusterrolebinding` | `crb` | list, get, delete |
+| `clusterauthzrole` | `car` | list, get, delete |
+| `clusterauthzrolebinding` | `carb` | list, get, delete |
 | `authzrole` | - | list, get, delete |
 | `authzrolebinding` | `rb` | list, get, delete |
 
@@ -135,6 +136,7 @@ occ component logs my-app                    # Logs from lowest environment
 occ component logs my-app --env production   # Specific environment
 occ component logs my-app --env dev -f       # Follow logs
 occ component logs my-app --since 30m        # Last 30 minutes
+occ component logs my-app --tail 100         # Last 100 lines
 ```
 
 ### workflow
@@ -191,7 +193,8 @@ occ clustercomponenttype list        # What component types are available cluste
 occ componenttype list               # What types are available in this namespace?
 occ clustertrait list                # What traits are available cluster-wide?
 occ trait list                       # What traits are in this namespace?
-occ workflow list                    # What build workflows exist?
+occ clusterworkflow list             # What build workflows exist cluster-wide?
+occ workflow list                    # What build workflows exist in this namespace?
 
 occ component list --project my-proj # What components are deployed?
 occ workload list                    # What workloads exist?
@@ -211,7 +214,7 @@ occ workload list                    # What workloads exist?
 - Wrong: `occ component get my-app --project default`
 - Right: `occ component get my-app` (with project set in context or globally)
 
-**deploymentPipelineRef is a string**: In Project YAML, use `deploymentPipelineRef: default`, not `deploymentPipelineRef: { kind: ..., name: ... }`.
+**deploymentPipelineRef is now an object**: In Project YAML, use `deploymentPipelineRef: {kind: DeploymentPipeline, name: default}`, not the plain string form `deploymentPipelineRef: default` (changed in v1.0.0-rc.1).
 
 **Docker workflow paths are repo-relative**: `repository.appPath` selects the source subdirectory and `workload.yaml`, but `docker.context` and `docker.filePath` must still point at real repo-root-relative paths. If `appPath` is `./backend`, a Dockerfile under `backend/` should use `docker.context: ./backend` and `docker.filePath: ./backend/Dockerfile`.
 

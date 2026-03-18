@@ -9,7 +9,7 @@ Use this index to jump to the section you need — do not read the whole file.
 | Deploy a pre-built container image | [Pre-built Image (BYOI)](#pre-built-image-byoi---simplest-path) |
 | Deploy from source / Git | [Building from Source](#building-from-source) |
 | Understand how the CI build produces a Workload | [How the CI Pipeline Works](#how-the-ci-pipeline-works) |
-| Write or fix `workload.yaml` (endpoints, connections) | [Workload Descriptor](#workload-descriptor-workloadyaml) |
+| Write or fix `workload.yaml` (endpoints, dependencies) | [Workload Descriptor](#workload-descriptor-workloadyaml) |
 | Scaffold Component YAML from the live cluster | [Using occ component scaffold](#using-occ-component-scaffold) |
 | Deploy to an environment or promote | [Deploying and Promoting](#deploying-and-promoting) |
 | Override config per environment | [ReleaseBinding with Overrides](#releasebinding-with-overrides) |
@@ -177,9 +177,9 @@ occ workload create \
 
 This reads your `workload.yaml`, merges it with the built image reference, and produces a full Workload CR. The controller then creates or updates the Workload in the control plane.
 
-**With descriptor**: The Workload CR gets endpoints, connections, configurations, and the image. The platform knows how to route traffic, inject connection env vars, and configure networking.
+**With descriptor**: The Workload CR gets endpoints, dependencies, configurations, and the image. The platform knows how to route traffic, inject connection env vars, and configure networking.
 
-**Without descriptor**: The Workload CR gets just the container image. No endpoints, no connections, no special configuration. The component deploys but the platform can't set up routing or service discovery for it.
+**Without descriptor**: The Workload CR gets just the container image. No endpoints, no dependencies, no special configuration. The component deploys but the platform can't set up routing or service discovery for it.
 
 ### What This Means for You
 
@@ -191,7 +191,7 @@ This reads your `workload.yaml`, merges it with the built image reference, and p
 
 ## Workload Descriptor (workload.yaml)
 
-When building from source, place a `workload.yaml` at the root of the `appPath` directory. This tells the build workflow what endpoints, connections, and configurations your service has.
+When building from source, place a `workload.yaml` at the root of the `appPath` directory. This tells the build workflow what endpoints, dependencies, and configurations your service has.
 
 **Placement rules**:
 - If `appPath: .` -> `workload.yaml` at repo root
@@ -218,7 +218,7 @@ endpoints:
     visibility:                 # additional scopes beyond implicit "project"
       - external
 
-connections:
+dependencies:
   - component: backend-api      # target component name (required)
     endpoint: api               # target endpoint name (required)
     visibility: project         # project, namespace, or internal (required)
@@ -260,8 +260,8 @@ HTTP, REST, gRPC, GraphQL, Websocket, TCP, UDP
 - `internal` - needs westbound gateway
 - `external` - needs northbound gateway (usually configured)
 
-### Connection EnvBindings
-The platform resolves the target service address and injects env vars. Use connections instead of hardcoding URLs. At least one envBinding field should be set.
+### Dependency EnvBindings
+The platform resolves the target service address and injects env vars. Use dependencies instead of hardcoding URLs. At least one envBinding field should be set.
 
 ## Using occ component scaffold
 
@@ -314,7 +314,7 @@ spec:
     projectName: default
   componentTypeEnvOverrides:
     replicas: 3
-  traitOverrides:
+  traitEnvironmentConfigs:
     data-storage:             # keyed by trait instanceName
       size: 100Gi
       storageClass: production-ssd
@@ -331,7 +331,7 @@ Each service becomes its own Component. For a typical frontend + backend app:
 
 1. **Backend**: `deployment/service` ComponentType, workload descriptor with API endpoints
 2. **Frontend**: `deployment/web-application` ComponentType (or similar available type)
-3. **Communication**: Use connections in the frontend's workload descriptor to reference the backend
+3. **Communication**: Use dependencies in the frontend's workload descriptor to reference the backend
 4. **Workflow choice**: If a frontend uses a custom Dockerfile, nginx proxy, or custom runtime, prefer the `docker` workflow over `react`
 
 For source builds with separate directories:
@@ -350,9 +350,9 @@ my-app/
 
 Backend component uses `appPath: ./backend`, frontend uses `appPath: ./frontend`.
 
-Frontend's workload.yaml uses connections:
+Frontend's workload.yaml uses dependencies:
 ```yaml
-connections:
+dependencies:
   - component: backend-service
     endpoint: api
     visibility: project
@@ -412,7 +412,7 @@ container:
   env:
     - key: DB_PASSWORD
       valueFrom:
-        secretRef:
+        secretKeyRef:
           name: my-secrets
           key: db-password
 
@@ -449,9 +449,9 @@ componentTypeEnvOverrides:
 
 ### Connection-injected env vars
 
-When using Workload connections, the platform automatically injects env vars with resolved service addresses. You control the env var names through `envBindings`:
+When using Workload dependencies, the platform automatically injects env vars with resolved service addresses. You control the env var names through `envBindings`:
 ```yaml
-connections:
+dependencies:
   - component: backend-api
     endpoint: api
     visibility: project
@@ -623,7 +623,7 @@ For each service in the project:
 3. **Make the listen port configurable** - `const port = process.env.PORT || 3001`
 4. **Move secrets to env vars** - never bake credentials into images
 5. **For frontends**: switch to relative API paths + proxy pattern, or use build-time env vars
-6. **Create workload.yaml** - declare endpoints, connections with envBindings matching the env var names you chose
+6. **Create workload.yaml** - declare endpoints, dependencies with envBindings matching the env var names you chose
 7. **Verify locally** - the app should still work with default env var values
 
 After changes, tell the user exactly what was modified and why, so they understand the pattern for future services.
@@ -653,7 +653,7 @@ The official Kubernetes manifests (or Helm values, docker-compose files) are the
 - **Service address env vars** — some services are wired by explicit env vars, not connection injection
 - **Optional service addresses** — addresses for services that may not be deployed in your setup
 
-**Do not assume connections alone are sufficient.** Connections inject service addresses, but they do not provide `PORT`, feature flags, or other app-level config.
+**Do not assume dependencies alone are sufficient.** Dependencies inject service addresses, but they do not provide `PORT`, feature flags, or other app-level config.
 
 ### Step 3 — Create components without workflows
 
@@ -668,13 +668,13 @@ create_component(namespace, project, name, componentType)   ← no workflow para
 Apply workloads using `occ apply -f <file>` for batches. Each workload must include:
 
 1. The pre-built image
-2. **All env vars from the official manifest** — `PORT`, feature flags, and any explicit service addresses not covered by connections
-3. Connections for service-to-service communication (using `envBindings`)
+2. **All env vars from the official manifest** — `PORT`, feature flags, and any explicit service addresses not covered by dependencies
+3. Dependencies for service-to-service communication (using `envBindings`)
 
-**`connections` is always an array, not a map:**
+**`dependencies` is always an array, not a map:**
 
 ```yaml
-connections:
+dependencies:
 - name: cache                     # required name field
   component: my-cache
   endpoint: tcp
@@ -716,8 +716,8 @@ Apps may `panic` or crash at startup if an env var for an optional or add-on ser
 
 For apps with many services, batch workloads into YAML files and apply with `occ apply`:
 
-1. Write workloads **without** connections to one file — apply first (simpler, creates all base deployments)
-2. Write workloads **with** connections to a second file — apply second
+1. Write workloads **without** dependencies to one file — apply first (simpler, creates all base deployments)
+2. Write workloads **with** dependencies to a second file — apply second
 3. Verify with `list_release_bindings` per component
 4. For any service still failing, immediately check `query_component_logs` — do not assume a platform issue before reading the app logs
 
@@ -729,7 +729,7 @@ For apps with many services, batch workloads into YAML files and apply with `occ
 4. [ ] Identify optional service env vars — plan placeholder values
 5. [ ] Create project
 6. [ ] Create all components via `create_component` **without** `workflow` parameter
-7. [ ] Apply workloads via `occ apply` with: image, all env vars from manifests, connections
+7. [ ] Apply workloads via `occ apply` with: image, all env vars from manifests, dependencies
 8. [ ] Verify release binding status for each component
 9. [ ] For any failing component, check logs with `query_component_logs` immediately before assuming platform issue
 
@@ -788,7 +788,7 @@ Read the `status.conditions` section in `occ get` output. Common condition issue
 
 **ComponentType not found**: The referenced type doesn't exist. Check `occ clustercomponenttype list`.
 
-**Build not running**: BuildPlane might not be configured. Escalate to PE.
+**Build not running**: WorkflowPlane might not be configured. Escalate to PE.
 
 **Rendering failed**: Usually a missing gateway or invalid parameter. Check the error message in conditions.
 

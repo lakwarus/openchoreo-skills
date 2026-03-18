@@ -5,7 +5,7 @@ This document maps platform engineer workflows to the `mcp__openchoreo-cp__*` (c
 > **Note on platform resource management**:
 > - `create_environment` — no MCP tool; use `occ apply -f`
 > - `create_deployment_pipeline` — no MCP tool; use **`kubectl apply -f`** (occ apply has a schema bug for this resource type — see `cli-and-resources.md`)
-> - DataPlane, BuildPlane, ObservabilityPlane CRUD — no MCP tools; use `occ apply -f` or `kubectl apply -f`
+> - DataPlane, WorkflowPlane, ObservabilityPlane CRUD — no MCP tools; use `occ apply -f` or `kubectl apply -f`
 >
 > `create_project` MCP now accepts a `deployment_pipeline` parameter — always pass it explicitly to avoid defaulting to `deploymentPipelineRef: default`.
 
@@ -107,17 +107,15 @@ spec:
           listenerName: http
   secretStoreRef:
     name: default
-  imagePullSecretRefs:
-    - name: registry-credentials
   observabilityPlaneRef:
     name: default
 ```
 
-### BuildPlane
+### WorkflowPlane (formerly BuildPlane)
 
 ```yaml
 apiVersion: openchoreo.dev/v1alpha1
-kind: BuildPlane                    # also ClusterBuildPlane
+kind: WorkflowPlane                 # also ClusterWorkflowPlane
 metadata:
   name: default
   namespace: default
@@ -182,11 +180,9 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: staging
-          requiresApproval: false
     - sourceEnvironmentRef: staging
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: true
 ```
 
 ### Project
@@ -198,7 +194,9 @@ metadata:
   name: default
   namespace: default
 spec:
-  deploymentPipelineRef: default     # plain string, not an object
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: default
 ```
 
 ### ObservabilityAlertsNotificationChannel
@@ -230,7 +228,7 @@ spec:
 
 ### 1. Initial Platform Setup
 
-Environments and DeploymentPipelines have no MCP create tools — use `occ apply -f` (see `cli-and-resources.md` → Creating Platform Resources with occ). Plane resources (DataPlane, BuildPlane, ObservabilityPlane) also use `occ apply -f`.
+Environments and DeploymentPipelines have no MCP create tools — use `occ apply -f` (see `cli-and-resources.md` → Creating Platform Resources with occ). Plane resources (DataPlane, WorkflowPlane, ObservabilityPlane) also use `occ apply -f`.
 
 ```bash
 # Step 1 — login to occ (local setup)
@@ -283,7 +281,7 @@ list_cluster_traits(namespace)               → what traits are registered?
 list_workflows(namespace)                    → what build workflows exist?
 ```
 
-For plane status (DataPlane, BuildPlane, ObservabilityPlane), use the REST API since there are no MCP tools for these:
+For plane status (DataPlane, WorkflowPlane, ObservabilityPlane), use the REST API since there are no MCP tools for these:
 
 ```bash
 # Get all dataplanes
@@ -291,7 +289,7 @@ curl -s -H "Authorization: Bearer $MCP_TOKEN" \
   "http://api.openchoreo.localhost:8080/api/v1/namespaces/default/dataplanes"
 
 # If the REST API doesn't expose planes, kubectl is the fallback
-kubectl get clusterdataplane,clusterbuildplane,clusterobservabilityplane -A
+kubectl get clusterdataplane,clusterworkflowplane,clusterobservabilityplane -A
 ```
 
 ### 3. Register Component Types
@@ -391,11 +389,11 @@ Fall back to `kubectl` only if the REST API does not expose the resource.
 
 **`create_environment` and `create_deployment_pipeline` are not MCP tools**: Use `occ apply -f` instead. See `cli-and-resources.md` → Creating Platform Resources with occ for YAML examples and auth setup.
 
-**DataPlane/BuildPlane/ObservabilityPlane CRUD is not exposed via MCP or REST API**: Use `occ apply -f <file>` if occ is available, otherwise `kubectl apply`. Helm values control plane registration at install time.
+**DataPlane/WorkflowPlane/ObservabilityPlane CRUD is not exposed via MCP or REST API**: Use `occ apply -f <file>` if occ is available, otherwise `kubectl apply`. Helm values control plane registration at install time.
 
-**`deploymentPipelineRef` is a plain string**: In Project YAML, use `deploymentPipelineRef: default`, not an object with `kind`/`name`.
+**`deploymentPipelineRef` is now an object**: In Project YAML, use `deploymentPipelineRef: {kind: DeploymentPipeline, name: default}`, not the plain string form (changed in v1.0.0-rc.1).
 
-**Namespace-scoped vs cluster-scoped**: `DataPlane`/`BuildPlane`/`ObservabilityPlane` come in both namespace-scoped and cluster-scoped (`ClusterDataPlane`, etc.) variants. Use cluster-scoped for shared infrastructure; namespace-scoped for tenant isolation.
+**Namespace-scoped vs cluster-scoped**: `DataPlane`/`WorkflowPlane`/`ObservabilityPlane` come in both namespace-scoped and cluster-scoped (`ClusterDataPlane`, etc.) variants. Use cluster-scoped for shared infrastructure; namespace-scoped for tenant isolation.
 
 **Status conditions are your debug tool**: `get_component` and `get_workload` return `status.conditions`. Check `reason` and `message` fields for any resource that isn't `Ready`. For environment status, use `occ environment get <name>` (no MCP `get_environment` tool).
 
@@ -407,4 +405,4 @@ Fall back to `kubectl` only if the REST API does not expose the resource.
 
 **No observability data after plane registration**: Inspect the ObservabilityPlane with `kubectl describe`. Missing data usually means the agent CA cert is wrong or `observerURL` is unreachable.
 
-**`connections` must be an array, not a map**: The `get_workload_schema` may report connections as a JSON object. The API requires an array of connection objects.
+**`dependencies` must be an array, not a map**: The `get_workload_schema` may describe the field as a JSON object. The API requires an array of dependency objects.

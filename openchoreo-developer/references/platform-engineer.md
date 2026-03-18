@@ -165,8 +165,8 @@ Key configuration by PE:
 
 Multiple DataPlane CRs can share the same `planeID` for multi-tenancy.
 
-### Build Plane
-Kubernetes cluster for CI/CD execution (Argo Workflows).
+### WorkflowPlane (formerly Build Plane)
+Kubernetes cluster for CI/CD execution (Argo Workflows). The CRD was renamed from `BuildPlane` to `WorkflowPlane` in v1.0.0-rc.1.
 
 Key configuration:
 - `planeID` - must match cluster agent helm value
@@ -174,7 +174,7 @@ Key configuration:
 - `secretStoreRef` - for build secrets (registry creds, repo access)
 
 ### Observability Plane
-Centralized logging via OpenSearch + Fluentbit. Enables `occ component logs`.
+Centralized logging via Fluentbit. The RCA agent report backend uses SQLite by default (switched from OpenSearch in v1.0.0-rc.1). Enables `occ component logs`.
 
 ## Gateway Configuration
 
@@ -233,8 +233,8 @@ When you hit something that requires PE help, here's what's likely needed:
 ### New Environment Needed
 "We need a [staging/production] environment for [reason]. Can the PE team create an Environment resource pointing to the appropriate DataPlane?"
 
-### Build Plane Issues
-"Builds aren't running. This usually means the BuildPlane isn't configured or the agent isn't connected. Can the PE team check the BuildPlane status and agent connectivity?"
+### WorkflowPlane Issues
+"Builds aren't running. This usually means the WorkflowPlane isn't configured or the agent isn't connected. Can the PE team check the WorkflowPlane status and agent connectivity?"
 
 ### Custom Workflow Needed
 "We need a build workflow that [does X differently from existing workflows]. Can the PE team create a ComponentWorkflow with [requirements]?"
