@@ -13,10 +13,12 @@ metadata:
   name: my-project
   namespace: default
 spec:
-  deploymentPipelineRef: default
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: default
 ```
 
-**Important**: `deploymentPipelineRef` is a plain string. Using an object `{kind: ..., name: ...}` will fail with an unmarshal error.
+**Important**: `deploymentPipelineRef` is an object with `kind` and `name` fields (changed in v1.0.0-rc.1 — previously a plain string).
 
 ## Component
 
@@ -88,7 +90,7 @@ spec:
         value: info
       - key: DB_PASSWORD
         valueFrom:
-          secretRef:
+          secretKeyRef:
             name: db-secrets
             key: password
     files:
@@ -99,7 +101,7 @@ spec:
       - key: cert.pem
         mountPath: /etc/ssl/cert.pem
         valueFrom:
-          secretRef:
+          secretKeyRef:
             name: tls-certs
             key: cert
   endpoints:
@@ -119,7 +121,7 @@ spec:
     metrics:
       type: HTTP
       port: 9090
-  connections:
+  dependencies:
     - component: backend-api
       endpoint: api
       visibility: project
@@ -155,7 +157,7 @@ endpoints:
     visibility:
       - external
 
-connections:
+dependencies:
   - component: backend-api
     endpoint: api
     visibility: project
@@ -182,7 +184,7 @@ configurations:
         {"debug": false}
 ```
 
-Note: The descriptor uses `name` plus `valueFrom.secretKeyRef`. The generated Workload uses `key` plus `valueFrom.secretRef`. The build workflow handles the conversion.
+Note: Both the descriptor and the Workload CR now use `name`/`key` plus `valueFrom.secretKeyRef`. The build workflow handles merging the built image into the descriptor to produce the Workload CR.
 
 ## Environment
 
@@ -212,11 +214,9 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: staging
-          requiresApproval: false
     - sourceEnvironmentRef: staging
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: false
 ```
 
 ## ReleaseBinding
@@ -236,7 +236,7 @@ spec:
   state: Active
   componentTypeEnvOverrides:
     replicas: 3
-  traitOverrides:
+  traitEnvironmentConfigs:
     storage:
       size: 100Gi
       storageClass: fast-ssd

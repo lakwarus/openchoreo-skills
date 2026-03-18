@@ -8,7 +8,7 @@ This sample shows how to deploy the [Google Cloud Platform Online Boutique (micr
 
 - Mapping 12 heterogeneous microservices to OpenChoreo ComponentTypes
 - BYOI (Bring Your Own Image) deployment using pre-built Google images
-- Service-to-service wiring using OpenChoreo `connections` and `envBindings` instead of hardcoded env vars
+- Service-to-service wiring using OpenChoreo `dependencies` and `envBindings` instead of hardcoded env vars
 - gRPC and HTTP endpoints declared natively
 - Port remapping (emailservice svc:5000 → container:8080)
 - `worker` ComponentType for the Locust load generator
@@ -81,7 +81,7 @@ Produces a full mapping table:
 Calls `get_workload_schema` to discover:
 - Env var key field is `key` (not `name`)
 - `gRPC` is a valid endpoint type
-- `connections` with `envBindings` is the native way to inject service addresses
+- `dependencies` with `envBindings` is the native way to inject service addresses
 - `visibility: [external]` on an endpoint routes through the gateway
 
 ### Phase 4 — Deployment (tiered, dependency order)
@@ -121,7 +121,7 @@ Each tier: create Component → create Workload → verify `status: Ready`.
 
 ## Known issues and workarounds discovered during this run
 
-> **Status:** Both issues below have been fixed in the current MCP server. `create_workload` now works correctly. The `connections` must still be an array (issue #2 was a documentation/schema bug, not a runtime bug).
+> **Status:** Both issues below have been fixed in the current MCP server. `create_workload` now works correctly. The `dependencies` must still be an array (issue #2 was a documentation/schema bug, not a runtime bug).
 
 ### 1. `create_workload` MCP tool — missing workload name derivation *(fixed)*
 
@@ -151,24 +151,24 @@ curl -s -X POST "$API_BASE/api/v1/namespaces/default/workloads" \
       "owner": {"componentName": "<component-name>", "projectName": "default"},
       "container": {"image": "<image>"},
       "endpoints": { ... },
-      "connections": [ ... ]
+      "dependencies": [ ... ]
     }
   }'
 ```
 
-### 2. `get_workload_schema` — connections reported as map, API expects array
+### 2. `get_workload_schema` — dependencies reported as map, API expects array
 
-**Symptom:** Workloads with connections fail with:
+**Symptom:** Workloads with dependencies fail with:
 ```
 can't decode JSON body: json: cannot unmarshal object into Go struct field
-WorkloadSpec.spec.connections of type []gen.WorkloadConnection
+WorkloadSpec.spec.dependencies of type []gen.WorkloadDependency
 ```
 
-**Root cause:** `get_workload_schema` returns connections as a JSON object (map). The actual API requires an **array**.
+**Root cause:** `get_workload_schema` returns dependencies as a JSON object (map). The actual API requires an **array**.
 
 **Correct format:**
 ```json
-"connections": [
+"dependencies": [
   {
     "component": "productcatalogservice",
     "endpoint": "grpc",
@@ -180,7 +180,7 @@ WorkloadSpec.spec.connections of type []gen.WorkloadConnection
 
 **Wrong format (as reported by schema):**
 ```json
-"connections": {
+"dependencies": {
   "productcatalogservice": {
     "component": "productcatalogservice",
     ...
@@ -225,11 +225,11 @@ Redis: `redis:alpine`
 
 // cartservice
 {"container": {"image": ".../cartservice:v0.10.4"}, "endpoints": {"grpc": {"type": "gRPC", "port": 7070, "visibility": ["project"]}},
- "connections": [{"component": "redis-cart", "endpoint": "redis", "visibility": "project", "envBindings": {"address": "REDIS_ADDR"}}]}
+ "dependencies": [{"component": "redis-cart", "endpoint": "redis", "visibility": "project", "envBindings": {"address": "REDIS_ADDR"}}]}
 
 // recommendationservice
 {"container": {"image": ".../recommendationservice:v0.10.4", "env": [{"key": "PORT", "value": "8080"}, {"key": "DISABLE_PROFILER", "value": "1"}]}, "endpoints": {"grpc": {"type": "gRPC", "port": 8080, "visibility": ["project"]}},
- "connections": [{"component": "productcatalogservice", "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "PRODUCT_CATALOG_SERVICE_ADDR"}}]}
+ "dependencies": [{"component": "productcatalogservice", "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "PRODUCT_CATALOG_SERVICE_ADDR"}}]}
 ```
 
 ### Tier 3
@@ -238,7 +238,7 @@ Redis: `redis:alpine`
 // checkoutservice
 {"container": {"image": ".../checkoutservice:v0.10.4", "env": [{"key": "PORT", "value": "5050"}]},
  "endpoints": {"grpc": {"type": "gRPC", "port": 5050, "visibility": ["project"]}},
- "connections": [
+ "dependencies": [
    {"component": "productcatalogservice", "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "PRODUCT_CATALOG_SERVICE_ADDR"}},
    {"component": "shippingservice",       "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "SHIPPING_SERVICE_ADDR"}},
    {"component": "paymentservice",        "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "PAYMENT_SERVICE_ADDR"}},
@@ -254,7 +254,7 @@ Redis: `redis:alpine`
 // frontend — visibility: external exposes through the gateway
 {"container": {"image": ".../frontend:v0.10.4", "env": [{"key": "PORT", "value": "8080"}, {"key": "ENABLE_PROFILER", "value": "0"}]},
  "endpoints": {"http": {"type": "HTTP", "port": 8080, "visibility": ["external"]}},
- "connections": [
+ "dependencies": [
    {"component": "productcatalogservice",  "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "PRODUCT_CATALOG_SERVICE_ADDR"}},
    {"component": "currencyservice",        "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "CURRENCY_SERVICE_ADDR"}},
    {"component": "cartservice",            "endpoint": "grpc", "visibility": "project", "envBindings": {"address": "CART_SERVICE_ADDR"}},
@@ -270,7 +270,7 @@ Redis: `redis:alpine`
 ```json
 // loadgenerator — worker, no endpoints exposed
 {"container": {"image": ".../loadgenerator:v0.10.4", "env": [{"key": "USERS", "value": "10"}, {"key": "RATE", "value": "1"}]},
- "connections": [{"component": "frontend", "endpoint": "http", "visibility": "project", "envBindings": {"address": "FRONTEND_ADDR"}}]}
+ "dependencies": [{"component": "frontend", "endpoint": "http", "visibility": "project", "envBindings": {"address": "FRONTEND_ADDR"}}]}
 ```
 
 ---
@@ -283,7 +283,7 @@ OpenChoreo automatically generates a cell diagram showing all 12 components and 
 
 ![Cell diagram](screenshots/01-cell-diagram.png)
 
-> **To capture:** Open the OpenChoreo console → select the `default` project → the topology/cell view renders the full graph automatically from the declared `connections`.
+> **To capture:** Open the OpenChoreo console → select the `default` project → the topology/cell view renders the full graph automatically from the declared `dependencies`.
 
 ---
 
@@ -321,8 +321,8 @@ If the `openchoreo-obs` MCP server is configured and an ObservabilityPlane is re
 
 - **Use BYOI for demos and migrations** — skip source builds entirely when public images are available
 - **Name components exactly as the original service names** — OpenChoreo injects DNS names based on component names; matching the original names means env var expectations often work without changes
-- **Use `connections` + `envBindings` over hardcoded addresses** — the platform resolves addresses at deploy time and handles environment promotion automatically
+- **Use `dependencies` + `envBindings` over hardcoded addresses** — the platform resolves addresses at deploy time and handles environment promotion automatically
 - **`visibility: [external]` on one endpoint is enough for gateway exposure** — the platform wires the gateway automatically, no additional Trait needed (in a default single-cluster setup)
 - **`targetPort` handles port remapping** — use it when the Kubernetes Service port differs from the container listen port (as with emailservice)
 - **`worker` ComponentType for traffic generators / sidecars** — anything with no exposed endpoints and no inbound traffic fits the worker type
-- **Deploy in dependency order** — leaf services first, orchestrators last; OpenChoreo doesn't enforce ordering but connections fail to resolve if the target component hasn't been created yet
+- **Deploy in dependency order** — leaf services first, orchestrators last; OpenChoreo doesn't enforce ordering but dependencies fail to resolve if the target component hasn't been created yet

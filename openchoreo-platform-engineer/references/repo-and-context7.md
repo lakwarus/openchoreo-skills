@@ -80,8 +80,8 @@ All at `api/v1alpha1/`:
 |------|-------|
 | `dataplane_types.go` | DataPlane, GatewaySpec, SecretStoreRef |
 | `clusterdataplane_types.go` | ClusterDataPlane |
-| `buildplane_types.go` | BuildPlane |
-| `clusterbuildplane_types.go` | ClusterBuildPlane |
+| `workflowplane_types.go` | WorkflowPlane |
+| `clusterworkflowplane_types.go` | ClusterWorkflowPlane |
 | `observabilityplane_types.go` | ObservabilityPlane |
 | `clusterobservabilityplane_types.go` | ClusterObservabilityPlane |
 | `componenttype_types.go` | ComponentType |
@@ -95,7 +95,7 @@ All at `api/v1alpha1/`:
 | `deploymenttrack_types.go` | DeploymentTrack |
 | `component_types.go` | Component |
 | `workload_types.go` | Workload |
-| `release_types.go` | ComponentRelease |
+| `renderedrelease_types.go` | RenderedRelease (formerly Release) |
 | `releasebinding_types.go` | ReleaseBinding |
 | `secretreference_types.go` | SecretReference |
 
@@ -103,7 +103,7 @@ All at `api/v1alpha1/`:
 
 All at `internal/controller/<name>/controller.go`:
 
-PE-relevant: `dataplane`, `clusterdataplane`, `buildplane`, `clusterbuildplane`, `observabilityplane`, `clusterobservabilityplane`, `componenttype`, `clustercomponenttype`, `trait`, `clustertrait`, `workflow`, `environment`, `deploymentpipeline`
+PE-relevant: `dataplane`, `clusterdataplane`, `workflowplane`, `clusterworkflowplane`, `observabilityplane`, `clusterobservabilityplane`, `componenttype`, `clustercomponenttype`, `trait`, `clustertrait`, `workflow`, `clusterworkflow`, `environment`, `deploymentpipeline`
 
 ### Helm charts
 

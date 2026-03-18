@@ -338,7 +338,7 @@ The build workflow pods run as a specific service account. For cloud registries 
 ```bash
 # AWS (IRSA)
 kubectl annotate serviceaccount workflow-sa \
-  -n openchoreo-build-plane \
+  -n openchoreo-workflow-plane \
   eks.amazonaws.com/role-arn="arn:aws:iam::ACCOUNT:role/BuildRole"
 
 # Same for the CI namespace

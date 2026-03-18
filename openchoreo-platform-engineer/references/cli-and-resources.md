@@ -17,19 +17,19 @@
 
 ```bash
 # macOS Apple Silicon (ARM64)
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_arm64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_darwin_arm64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 # macOS Intel (AMD64)
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_darwin_amd64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_darwin_amd64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 # Linux x64
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_amd64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_linux_amd64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 # Linux ARM64
-curl -L https://github.com/openchoreo/openchoreo/releases/download/v0.17.0/occ_v0.17.0_linux_arm64.tar.gz \
+curl -L https://github.com/openchoreo/openchoreo/releases/download/v1.0.0-rc.1/occ_v1.0.0-rc.1_linux_arm64.tar.gz \
   | tar -xz && sudo mv occ /usr/local/bin/
 
 occ version   # verify
@@ -110,11 +110,9 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: qa
-          requiresApproval: false
     - sourceEnvironmentRef: qa
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: false
 EOF
 kubectl apply -f /tmp/pipeline.yaml   # use kubectl, not occ apply
 ```
@@ -143,7 +141,9 @@ metadata:
   annotations:
     openchoreo.dev/display-name: Foo
 spec:
-  deploymentPipelineRef: foo-pipeline   # plain string, not an object
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: foo-pipeline
 EOF
 occ apply -f /tmp/project.yaml
 ```
@@ -167,7 +167,7 @@ Prefer `occ` for all OpenChoreo resource management. Use `kubectl` only for clus
 | Command | Alias | What it does |
 |---------|-------|-------------|
 | `occ dataplane list/get` | `dp` | Inspect DataPlane CRs |
-| `occ buildplane list/get` | `bp` | Inspect BuildPlane CRs |
+| `occ workflowplane list/get` | `wp` | Inspect WorkflowPlane CRs (formerly BuildPlane) |
 | `occ observabilityplane list/get` | `op` | Inspect ObservabilityPlane CRs |
 | `occ environment list/get` | `env` | Inspect Environments |
 | `occ deploymentpipeline list/get` | `deppipe` | Inspect promotion paths |
@@ -176,8 +176,8 @@ Prefer `occ` for all OpenChoreo resource management. Use `kubectl` only for clus
 | `occ trait list/get` | `traits` | Inspect namespace-scoped traits |
 | `occ clustertrait list/get` | `clustertraits` | Inspect cluster-scoped traits |
 | `occ workflow list/get` | `wf` | Inspect workflow templates |
-| `occ authzclusterrole list/get` | `cr` | Inspect cluster roles |
-| `occ authzclusterrolebinding list/get` | `crb` | Inspect cluster role bindings |
+| `occ clusterauthzrole list/get` | `car` | Inspect cluster roles |
+| `occ clusterauthzrolebinding list/get` | `carb` | Inspect cluster role bindings |
 | `occ authzrole list/get` | - | Inspect namespace roles |
 | `occ authzrolebinding list/get` | `rb` | Inspect role bindings |
 | `occ apply -f <file>` | - | Create/update any resource |
@@ -223,17 +223,15 @@ spec:
           listenerName: http
   secretStoreRef:
     name: default
-  imagePullSecretRefs:
-    - name: registry-credentials
   observabilityPlaneRef:
     name: default
 ```
 
-### BuildPlane
+### WorkflowPlane (formerly BuildPlane)
 
 ```yaml
 apiVersion: openchoreo.dev/v1alpha1
-kind: BuildPlane                    # also ClusterBuildPlane
+kind: WorkflowPlane                 # also ClusterWorkflowPlane
 metadata:
   name: default
   namespace: default
@@ -298,11 +296,9 @@ spec:
     - sourceEnvironmentRef: development
       targetEnvironmentRefs:
         - name: staging
-          requiresApproval: false
     - sourceEnvironmentRef: staging
       targetEnvironmentRefs:
         - name: production
-          requiresApproval: true
 ```
 
 ### Project
@@ -314,7 +310,9 @@ metadata:
   name: default
   namespace: default
 spec:
-  deploymentPipelineRef: default     # plain string, not an object
+  deploymentPipelineRef:
+    kind: DeploymentPipeline
+    name: default
 ```
 
 ### ObservabilityAlertsNotificationChannel

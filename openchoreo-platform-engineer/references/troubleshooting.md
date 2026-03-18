@@ -5,7 +5,7 @@
 - [General Approach](#general-approach)
 - [Control Plane Issues](#control-plane-issues)
 - [Data Plane Issues](#data-plane-issues)
-- [Build Plane Issues](#build-plane-issues)
+- [Workflow Plane Issues](#workflow-plane-issues)
 - [Observability Plane Issues](#observability-plane-issues)
 - [Connectivity Issues](#connectivity-issues)
 - [Common Failure Patterns](#common-failure-patterns)
@@ -20,7 +20,7 @@ Start from the plane where the failure manifests, then work outward.
 # Plane pod status
 kubectl get pods -n openchoreo-control-plane
 kubectl get pods -n openchoreo-data-plane
-kubectl get pods -n openchoreo-build-plane
+kubectl get pods -n openchoreo-workflow-plane
 kubectl get pods -n openchoreo-observability-plane
 
 # Resource conditions (primary debugging tool)
@@ -40,7 +40,7 @@ kubectl get <crd> -A
 | Backstage | `openchoreo-control-plane` | `kubectl logs deployment/backstage -n openchoreo-control-plane` |
 | Cluster Gateway | `openchoreo-control-plane` | `kubectl logs deployment/cluster-gateway -n openchoreo-control-plane` |
 | Data Plane Agent | `openchoreo-data-plane` | `kubectl logs deployment/cluster-agent -n openchoreo-data-plane` |
-| Build Plane Agent | `openchoreo-build-plane` | `kubectl logs deployment/cluster-agent -n openchoreo-build-plane` |
+| Workflow Plane Agent | `openchoreo-workflow-plane` | `kubectl logs deployment/cluster-agent -n openchoreo-workflow-plane` |
 | Observer | `openchoreo-observability-plane` | `kubectl logs deployment/observer -n openchoreo-observability-plane` |
 | Fluent Bit | `openchoreo-observability-plane` | `kubectl logs -l app.kubernetes.io/name=fluent-bit -n openchoreo-observability-plane` |
 | OpenSearch | `openchoreo-observability-plane` | `kubectl logs -l app=opensearch -n openchoreo-observability-plane` |
@@ -124,25 +124,25 @@ Common causes:
 - TLS certificate not provisioned
 - DNS not pointing to LoadBalancer
 
-## Build Plane Issues
+## Workflow Plane Issues
 
 ### Builds not starting
 
 ```bash
-# Check build plane agent connectivity
-kubectl logs deployment/cluster-agent -n openchoreo-build-plane --tail=50
+# Check workflow plane agent connectivity
+kubectl logs deployment/cluster-agent -n openchoreo-workflow-plane --tail=50
 
 # Check Argo Workflows controller
-kubectl get pods -n openchoreo-build-plane
-kubectl logs deployment/argo-workflows-workflow-controller -n openchoreo-build-plane --tail=50
+kubectl get pods -n openchoreo-workflow-plane
+kubectl logs deployment/argo-workflows-workflow-controller -n openchoreo-workflow-plane --tail=50
 
 # Check WorkflowRun status
 occ component workflowrun list <component>
-kubectl get workflows.argoproj.io -n openchoreo-build-plane
+kubectl get workflows.argoproj.io -n openchoreo-workflow-plane
 ```
 
 Common causes:
-- BuildPlane CR not registered in Control Plane
+- WorkflowPlane CR not registered in Control Plane
 - Agent disconnected
 - Argo Workflows controller not running
 - ClusterWorkflowTemplate missing
@@ -154,11 +154,11 @@ Common causes:
 occ component workflow logs <component> -f
 
 # Check Argo workflow pods
-kubectl get pods -n openchoreo-build-plane -l workflows.argoproj.io/workflow
-kubectl logs <workflow-pod> -n openchoreo-build-plane -c main
+kubectl get pods -n openchoreo-workflow-plane -l workflows.argoproj.io/workflow
+kubectl logs <workflow-pod> -n openchoreo-workflow-plane -c main
 
 # Check specific step
-kubectl logs <workflow-pod> -n openchoreo-build-plane -c <step-name>
+kubectl logs <workflow-pod> -n openchoreo-workflow-plane -c <step-name>
 ```
 
 Common causes:
@@ -256,7 +256,7 @@ kubectl get secret cluster-agent-tls -n <agent-namespace>
 
 Missing RBAC for a CRD. The agent service accounts are:
 - Data Plane: `cluster-agent-dataplane` in `openchoreo-data-plane`
-- Build Plane: `cluster-agent-buildplane` in `openchoreo-build-plane`
+- Workflow Plane: `cluster-agent-workflowplane` in `openchoreo-workflow-plane`
 - Observability Plane: `cluster-agent-observabilityplane` in `openchoreo-observability-plane`
 
 ### Webhook validation failures

@@ -204,10 +204,10 @@ query_component_logs(namespace, project, component, environment)
 **Key rules for this workflow:**
 
 - Never set `workflow` in `create_component` for BYO image deployments
-- Always extract ALL env vars from official manifests — connections inject service addresses but not `PORT`, feature flags, or vendor SDK disable flags
+- Always extract ALL env vars from official manifests — dependencies inject service addresses but not `PORT`, feature flags, or vendor SDK disable flags
 - If a service crash-loops before logging a "listening" message, look for a native module load error or vendor SDK init failure — apply the disable flag from the official manifests
 - If a required env var references an optional or not-yet-deployed service, set a placeholder value to prevent startup panics
-- `connections` must be a **list**, not a map — each entry needs a `name` field
+- `dependencies` must be a **list**, not a map — each entry needs a `name` field
 - Source builds fail for repos that use `ARG BUILDPLATFORM` multi-stage syntax (exit code 125) — switch to BYO immediately when you see this error
 
 ---
@@ -239,7 +239,7 @@ When working with an unfamiliar cluster, always explore in this order:
 
 **No `deploy_release` or `promote_component` MCP tools**: Deployment state is managed via `update_release_binding_state` (Active/Undeploy) and `patch_release_binding`. To promote to a downstream environment, use `occ apply -f releasebinding.yaml` with the target environment set.
 
-**`get_workload_schema` before writing workload YAML**: Call `get_workload_schema` to explore available fields rather than guessing. The `connections` field is an array of objects, not a map.
+**`get_workload_schema` before writing workload YAML**: Call `get_workload_schema` to explore available fields rather than guessing. The `dependencies` field is an array of objects, not a map.
 
 **`trigger_workflow_run` vs `create_workflow_run`**: `trigger_workflow_run` starts a build for a component using its configured workflow and parameters (pass optional `commit` SHA to pin to a revision). `create_workflow_run` creates a standalone run by workflow name with explicit parameters — use for workflows not tied to a component.
 
@@ -247,7 +247,7 @@ When working with an unfamiliar cluster, always explore in this order:
 
 **Two separate MCP servers**: `mcp__openchoreo-cp__*` talks to the control plane API; `mcp__openchoreo-obs__*` talks to the Observer API. Both must be configured. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
 
-**`connections` must be an array, not a map**: `get_workload_schema` may report connections as a JSON object. The API requires an array of connection objects: `[{"component": "...", "endpoint": "...", "visibility": "project", "envBindings": {"address": "ENV_VAR"}}]`.
+**`dependencies` must be an array, not a map**: `get_workload_schema` may describe the field as a JSON object. The API requires an array of dependency objects: `[{"component": "...", "endpoint": "...", "visibility": "project", "envBindings": {"address": "ENV_VAR"}}]`.
 
 **Use `query_component_logs` for quick triage**: `query_component_logs` is the fastest way to check runtime logs from the AI assistant. `query_workflow_logs` covers build/CI logs. Use the Backstage UI for the full dashboard.
 

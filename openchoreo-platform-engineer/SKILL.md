@@ -14,7 +14,7 @@ Use this skill for PE-owned work:
 
 - Cluster-side setup, upgrades, and troubleshooting
 - Helm, CRD, controller, or agent investigation
-- Platform resources such as DataPlane, BuildPlane, ObservabilityPlane, Environment, DeploymentPipeline, Project, ComponentType, Trait, and Workflow
+- Platform resources such as DataPlane, WorkflowPlane, ObservabilityPlane, Environment, DeploymentPipeline, Project, ComponentType, Trait, Workflow, and ClusterWorkflow
 - Shared platform capabilities such as gateways, secret stores, registries, identity, RBAC, and observability
 
 Activate `openchoreo-developer` at the same time when the task also includes any of these:
@@ -122,6 +122,7 @@ Keep these in mind because they are durable and high-value:
 - **Default to the `default` namespace.** Unless the user explicitly asks to create a new namespace, provision all environments, pipelines, and projects inside the existing `default` namespace. Always ask the user before creating a new namespace — new namespaces represent a significant organisational boundary and should be a conscious decision.
 - **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
 - `create_environment` and `create_deployment_pipeline` are not MCP tools. Environments use `occ apply -f`. Pipelines require `kubectl apply -f` due to an occ schema bug — see `references/cli-and-resources.md` → Create a DeploymentPipeline.
+- `deploymentPipelineRef` in Project YAML is now an object `{kind: DeploymentPipeline, name: <name>}` — plain string form removed in v1.0.0-rc.1.
 - `occ` must be installed **and** logged in before any `occ apply` will work. See `references/cli-and-resources.md` → occ Installation and Login, or https://openchoreo.dev/docs/user-guide/cli-installation/. `occ login` with `service_mcp_client` does not work — use browser-based login.
 - `create_project` via MCP supports a `deployment_pipeline` parameter — pass it explicitly to avoid defaulting to the `default` pipeline.
 - Upgrade order matters; do not move a remote plane ahead of the control plane.
