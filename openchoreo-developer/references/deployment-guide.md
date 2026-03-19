@@ -467,6 +467,31 @@ Your app can read whichever form fits the integration point.
 - For application code that wants the platform-resolved full upstream URL, `address` is convenient.
 - For nginx or other reverse proxies that already own a path like `/api/`, prefer `host` and `port`, and handle `basePath` separately if needed. This avoids doubled paths such as `/api/api/...`.
 
+**Important — TCP endpoints (databases, message brokers):** The `address` binding for a TCP endpoint injects a raw `host:port` string, NOT a protocol-specific DSN. Apps that expect a full connection string (e.g., `postgres://user:pass@host:5432/db?sslmode=disable`, `nats://host:4222`, `redis://host:6379`) will fail to parse the injected value. In these cases:
+- Declare the dependency (for the cell diagram/topology) but **omit** `envBindings`, OR
+- Set the full DSN as a literal env var using the resolved hostname from the release binding's `serviceURL.host` field
+- Get the hostname from: `get_release_binding` → `endpoints[*].serviceURL.host`
+
+```yaml
+# Wrong — injects "host:port", not a postgres DSN
+dependencies:
+  - component: my-postgres
+    endpoint: tcp
+    visibility: project
+    envBindings:
+      address: DATABASE_URL   # ← will be "host:5432", breaks pgx/GORM
+
+# Right — declare connection for topology, set DSN explicitly
+dependencies:
+  - component: my-postgres
+    endpoint: tcp
+    visibility: project        # no envBindings
+container:
+  env:
+    - key: DATABASE_URL
+      value: "postgres://user:pass@<serviceURL.host>:5432/db?sslmode=disable"
+```
+
 ### File-based configuration
 
 For config files (JSON, YAML, certificates):
@@ -474,19 +499,44 @@ For config files (JSON, YAML, certificates):
 # In Workload CR
 container:
   files:
-    - key: app-config
-      mountPath: /etc/config/app.json
+    - key: config.json           # this becomes the filename
+      mountPath: /etc/config     # this is the DIRECTORY — key is appended
       value: |
         {"cache_ttl": 300, "max_connections": 50}
+  # Result: file is mounted at /etc/config/config.json
 
 # In workload.yaml descriptor
 configurations:
   files:
     - name: app-config
-      mountPath: /etc/config/app.json
+      mountPath: /etc/config
       value: |
         {"cache_ttl": 300, "max_connections": 50}
 ```
+
+**Critical — `mountPath` is a directory, not a file path.** The controller appends the `key` to the `mountPath` to form the final path. If you set `mountPath: /etc/config/app.json` and `key: app.json`, the file lands at `/etc/config/app.json/app.json` (broken). Always set `mountPath` to the parent directory.
+
+```yaml
+# Wrong
+- key: config.json
+  mountPath: /usr/share/nginx/html/config.json  # ← file ends up at .../config.json/config.json
+
+# Right
+- key: config.json
+  mountPath: /usr/share/nginx/html              # ← file ends up at .../html/config.json
+```
+
+**SPA runtime config pattern (React/Vue/Angular with nginx):** Frontends that fetch a `/config.json` at runtime to discover backend URLs need this file mounted with resolved external service URLs. Inject the file via the workload `files` mount, not build-time env vars.
+
+```yaml
+container:
+  files:
+    - key: config.json
+      mountPath: /usr/share/nginx/html
+      value: '{"apiUrl":"https://...","wsUrl":"wss://..."}'
+```
+
+**Always use `https://` and `wss://` for browser-facing URLs.** OpenChoreo serves frontends over HTTPS. If backend URLs in the injected config use `http://` or `ws://`, browsers will block requests due to mixed content policy — silently with no visible error. Get the correct external URLs from `get_release_binding` → `endpoints[*].externalURLs`, then use `https://` and `wss://` scheme.
 
 ## Making Local Apps Work on OpenChoreo
 

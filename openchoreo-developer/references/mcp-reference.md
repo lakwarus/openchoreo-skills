@@ -249,6 +249,16 @@ When working with an unfamiliar cluster, always explore in this order:
 
 **`dependencies` must be an array, not a map**: `get_workload_schema` may describe the field as a JSON object. The API requires an array of dependency objects: `[{"component": "...", "endpoint": "...", "visibility": "project", "envBindings": {"address": "ENV_VAR"}}]`.
 
+**TCP `address` binding injects `host:port`, not a protocol DSN**: For databases (PostgreSQL, MySQL) and message brokers (NATS, Redis), the injected `address` value is a plain `host:port` string. Apps that expect `postgres://user:pass@host/db` or `nats://host:4222` will fail to parse it. Declare the dependency for the topology diagram but set the full DSN as a literal env var instead. Get the hostname from `get_release_binding` → `endpoints[*].serviceURL.host`.
+
+**Source-build workloads have no endpoints or connections until you add them**: The `generate-workload-cr` build step creates a minimal workload with just the image. If the repo has no `workload.yaml`, always call `update_workload` after a successful build to add endpoints, env vars, and dependencies. Without this the component deploys but has no routing, no connections, and the cell diagram renders incomplete.
+
+**File mount `mountPath` is a directory**: The controller appends the `key` name to `mountPath` to form the final file path. Set `mountPath` to the parent directory (`/usr/share/nginx/html`), not the full file path (`/usr/share/nginx/html/config.json`). Using the full file path doubles the filename: `.../config.json/config.json`.
+
+**Browser-facing apps need `https://` and `wss://` backend URLs**: OpenChoreo serves web-application components over HTTPS. Any backend URLs injected at runtime (e.g., via a mounted `config.json`) must use `https://` and `wss://`. HTTP/WS URLs are blocked by browsers as mixed content — no visible error, requests just silently fail. Always get external URLs from `get_release_binding` → `endpoints[*].externalURLs` and use the `https` scheme.
+
+**`update_workload` only needs `namespace_name`, `workload_name`, and `workload_spec`**: The `project_name` and `component_name` parameters are not accepted by this tool. Use `list_workloads` to get the workload name first.
+
 **Use `query_component_logs` for quick triage**: `query_component_logs` is the fastest way to check runtime logs from the AI assistant. `query_workflow_logs` covers build/CI logs. Use the Backstage UI for the full dashboard.
 
 **Observability data requires a live ObservabilityPlane**: If queries return no data, confirm the ObservabilityPlane is registered and healthy — escalate to `openchoreo-platform-engineer` if needed.
