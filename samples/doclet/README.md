@@ -79,12 +79,6 @@ Source build config (per service):
 | Frontend Ready (with config.json) | ~2 min |
 | **Total end-to-end** | **~10 min** |
 
-## Token usage
-
-Approximately **~50k tokens** across the full session (including cluster exploration and skill updates applied at the end).
-
----
-
 ## What Claude does (step by step)
 
 ### Phase 1 — Repo inspection
@@ -311,7 +305,6 @@ update_workload(doclet-frontend-workload, spec below)
 | Build method | 2 × BYO, 3 × source (dockerfile-builder) |
 | Frontend external URL | `http://http-doclet-fronte-development-default-<hash>.apps.aws.openchoreo-poc.choreo.dev` |
 | End-to-end deployment time | ~10 min |
-| Session tokens (approx.) | ~50k |
 
 ---
 

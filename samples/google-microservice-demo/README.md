@@ -113,7 +113,6 @@ Each tier: create Component → create Workload → verify `status: Ready`.
 | Frontend external URL | `http://http-frontend-development-default-<hash>.openchoreoapis.localhost:19080` |
 | Frontend connections resolved | 7 / 7 |
 | Deployment time (first component → all Ready) | ~9 min 22 sec |
-| Sub-agent tokens (repo research) | 13,526 |
 | Main session tool uses | ~75 |
 | MCP tool bugs encountered | 2 (see below — both fixed in current MCP server) |
 
