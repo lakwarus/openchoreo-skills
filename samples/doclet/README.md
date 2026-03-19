@@ -319,11 +319,11 @@ update_workload(doclet-frontend-workload, spec below)
 
 ### Cell diagram — service topology
 
-![Cell diagram](screenshots/01-cell-diagram.png)
+![Cell diagram](screenshots/cell-diagram.png)
 
 ### Web interface — Doclet in action
 
-![Web interface](screenshots/02-web-interface.png)
+![Web interface](screenshots/web-interface.png)
 
 ---
 
