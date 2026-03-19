@@ -24,7 +24,8 @@ Pair with `openchoreo-platform-engineer` for post-install work: creating environ
 
 Read only what the task needs:
 
-- `references/local-k3d.md` — **start here for local development** (Colima, Docker Desktop, or any local Docker environment); uses k3d, fixed localhost ports, plain HTTP, no IP resolution required
+- `references/local-colima.md` — **start here for Colima users**; uses Colima's native k3s, no extra tools required — just `colima start` commands the user already knows
+- `references/local-k3d.md` — **alternative local path** (any Docker environment); uses k3d with fixed localhost ports and plain HTTP — better for guaranteed Chrome browser access
 - `references/prerequisites.md` — tool versions, cluster requirements, Gateway API CRDs, cert-manager, external-secrets, kgateway, OpenBao, ClusterSecretStore
 - `references/control-plane.md` — TLS setup, Helm install, Thunder (identity provider), domain configuration, default resources
 - `references/data-plane.md` — data plane Helm install, LoadBalancer resolution, TLS certificate, ClusterDataPlane registration
@@ -34,7 +35,7 @@ Read only what the task needs:
 
 ## Working style
 
-1. **Ask for cluster type early** — local (Colima/Docker Desktop), EKS, GKE, AKS, k3s, or other. For local environments, always use the k3d path (`references/local-k3d.md`) — it avoids IP resolution, TLS, and browser-access problems. For cloud clusters, use the standard path.
+1. **Ask for cluster type early** — Colima, Docker Desktop, EKS, GKE, AKS, k3s, or other. For Colima users, always use `references/local-colima.md` first — the only prerequisite is `colima start`. For Docker Desktop or other Docker environments, use `references/local-k3d.md`. For cloud clusters, use the standard path.
 2. **Work step by step** — each plane depends on the previous one. Do not skip ahead.
 3. **Verify before proceeding** — after each major step, run the health/readiness check before moving to the next plane.
 4. **Use nip.io for domains** — the install uses `<ip>.nip.io` wildcard DNS; no external DNS configuration is needed.

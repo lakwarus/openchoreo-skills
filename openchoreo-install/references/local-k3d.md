@@ -1,8 +1,10 @@
-# Local Installation (k3d / Colima)
+# Local Installation with k3d
 
-Use this path for local development and evaluation. It uses fixed `*.openchoreo.localhost` domains with plain HTTP and pre-built values files — no TLS, no nip.io, no LoadBalancer IP resolution.
+Use this path for local development when you want guaranteed browser access via `localhost` ports. It uses fixed `*.openchoreo.localhost` domains with plain HTTP and pre-built values files — no TLS, no nip.io, no LoadBalancer IP resolution.
 
-> **Recommended for:** Colima, Docker Desktop, any local machine with Docker.
+> **Recommended for:** Docker Desktop or any local machine with Docker, when Chrome browser access to the console is required.
+>
+> **Colima users:** prefer [local-colima.md](local-colima.md) instead — it uses Colima's native k3s with no extra tools.
 >
 > **Not recommended for:** production, shared clusters, or cloud environments — use `control-plane.md` + `data-plane.md` instead.
 
