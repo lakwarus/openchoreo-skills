@@ -35,19 +35,19 @@ Before running the prompt, ensure the following are installed on your macOS mach
 
 ## Step 1 — Add the openchoreo-install skill to Claude Code
 
-The `openchoreo-install` skill lives in this repository. Add it to Claude Code globally so it is available in any project:
+Add just the `openchoreo-install` skill to Claude Code globally — you don't need the other skills in this repo for local installation:
 
 ```bash
-claude skills add https://github.com/lakwarus/openchoreo-skills -g
+claude skills add https://github.com/lakwarus/openchoreo-skills/tree/main/openchoreo-install -g
 ```
 
 Verify it loaded:
 ```bash
 claude skills list
-# Should show: openchoreo-install, openchoreo-developer, openchoreo-platform-engineer
+# Should show: openchoreo-install
 ```
 
-> Skills are loaded from the `SKILL.md` files in each subdirectory of this repo. The `-g` flag installs globally (available in all projects without any project-level config).
+> The `-g` flag installs globally (available in all projects without any project-level config). Pointing at the skill subdirectory directly loads only that skill.
 
 ---
 

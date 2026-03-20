@@ -26,7 +26,7 @@ Special thanks to Isala for creating the initial developer skills foundation.
 Want to get OpenChoreo running on your Mac in one prompt? See the [local Colima install sample](samples/install-openchoreo-on-local-colima/README.md):
 
 1. Install prerequisites: `brew install colima kubectl helm`
-2. Add this skill repo to Claude Code: `claude skills add https://github.com/lakwarus/openchoreo-skills -g`
+2. Add the install skill to Claude Code: `claude skills add https://github.com/lakwarus/openchoreo-skills/tree/main/openchoreo-install -g`
 3. Run Claude Code and paste:
    ```
    I want to try OpenChoreo on my local machine. I have Colima, kubectl, and
