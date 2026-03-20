@@ -379,6 +379,189 @@ $(echo "$AGENT_CA" | sed 's/^/        /')
 EOF
 ```
 
+## Step 7 — Install observability plane (optional)
+
+Provides logs (OpenSearch), metrics (Prometheus), and traces (OpenSearch).
+
+```bash
+kubectl create namespace openchoreo-observability-plane --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl get secret cluster-gateway-ca -n openchoreo-control-plane \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d | \
+  kubectl create configmap cluster-gateway-ca \
+    --from-file=ca.crt=/dev/stdin \
+    -n openchoreo-observability-plane \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl apply -f - <<'EOF'
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: opensearch-admin-credentials
+  namespace: openchoreo-observability-plane
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: default
+  target:
+    name: opensearch-admin-credentials
+  data:
+  - secretKey: username
+    remoteRef:
+      key: opensearch-username
+      property: value
+  - secretKey: password
+    remoteRef:
+      key: opensearch-password
+      property: value
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: observer-secret
+  namespace: openchoreo-observability-plane
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: default
+  target:
+    name: observer-secret
+  data:
+  - secretKey: OPENSEARCH_USERNAME
+    remoteRef:
+      key: opensearch-username
+      property: value
+  - secretKey: OPENSEARCH_PASSWORD
+    remoteRef:
+      key: opensearch-password
+      property: value
+  - secretKey: UID_RESOLVER_OAUTH_CLIENT_SECRET
+    remoteRef:
+      key: observer-oauth-client-secret
+      property: value
+EOF
+
+kubectl wait -n openchoreo-observability-plane \
+  --for=condition=Ready externalsecret/opensearch-admin-credentials \
+  externalsecret/observer-secret --timeout=60s
+
+# Install core — port 9080 avoids conflicts with CP (8080) and DP (19080)
+helm upgrade --install openchoreo-observability-plane oci://ghcr.io/openchoreo/helm-charts/openchoreo-observability-plane \
+  --version 1.0.0-rc.1 \
+  --namespace openchoreo-observability-plane \
+  --timeout 25m \
+  --values - <<'EOF'
+observer:
+  openSearchSecretName: opensearch-admin-credentials
+  secretName: observer-secret
+gateway:
+  httpPort: 9080
+  httpsPort: 9443
+  tls:
+    enabled: false
+EOF
+
+# Install observability modules
+helm upgrade --install observability-logs-opensearch \
+  oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+  --namespace openchoreo-observability-plane --version 0.3.8 \
+  --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials"
+
+helm upgrade --install observability-metrics-prometheus \
+  oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+  --namespace openchoreo-observability-plane --version 0.2.4
+
+helm upgrade --install observability-traces-opensearch \
+  oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+  --namespace openchoreo-observability-plane --version 0.3.7 \
+  --set openSearch.enabled=false \
+  --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials"
+
+kubectl wait -n openchoreo-observability-plane --for=condition=available --timeout=300s deployment --all
+```
+
+Configure with localhost hostname and reconfigure:
+
+```bash
+helm upgrade openchoreo-observability-plane oci://ghcr.io/openchoreo/helm-charts/openchoreo-observability-plane \
+  --version 1.0.0-rc.1 \
+  --namespace openchoreo-observability-plane \
+  --reuse-values --timeout 10m \
+  --values - <<'EOF'
+observer:
+  openSearchSecretName: opensearch-admin-credentials
+  secretName: observer-secret
+  controlPlaneApiUrl: "http://api.openchoreo.localhost:8080"
+  http:
+    hostnames:
+      - "observer.openchoreo.localhost"
+  cors:
+    allowedOrigins:
+      - "http://openchoreo.localhost:8080"
+  authzTlsInsecureSkipVerify: true
+security:
+  oidc:
+    issuer: "http://thunder.openchoreo.localhost:8080"
+    jwksUrl: "http://thunder-service.thunder.svc.cluster.local:8090/oauth2/jwks"
+    tokenUrl: "http://thunder-service.thunder.svc.cluster.local:8090/oauth2/token"
+    jwksUrlTlsInsecureSkipVerify: "true"
+    uidResolverTlsInsecureSkipVerify: "true"
+gateway:
+  httpPort: 9080
+  httpsPort: 9443
+  tls:
+    enabled: false
+EOF
+```
+
+Add observability gateway to CoreDNS and register the plane:
+
+```bash
+CP_GW_IP=$(kubectl get svc gateway-default -n openchoreo-control-plane -o jsonpath='{.spec.clusterIP}')
+DP_GW_IP=$(kubectl get svc gateway-default -n openchoreo-data-plane -o jsonpath='{.spec.clusterIP}')
+OBS_GW_IP=$(kubectl get svc gateway-default -n openchoreo-observability-plane -o jsonpath='{.spec.clusterIP}')
+
+kubectl patch configmap coredns -n kube-system --type merge -p "{
+  \"data\": {
+    \"Corefile\": \".:53 {\n    errors\n    health\n    ready\n    kubernetes cluster.local in-addr.arpa ip6.arpa {\n      pods insecure\n      fallthrough in-addr.arpa ip6.arpa\n    }\n    hosts {\n      ${CP_GW_IP} openchoreo.localhost\n      ${CP_GW_IP} api.openchoreo.localhost\n      ${CP_GW_IP} thunder.openchoreo.localhost\n      ${DP_GW_IP} openchoreoapis.openchoreo.localhost\n      ${OBS_GW_IP} observer.openchoreo.localhost\n      fallthrough\n    }\n    prometheus :9153\n    forward . /etc/resolv.conf\n    cache 30\n    loop\n    reload\n    loadbalance\n}\n\"
+  }
+}"
+
+kubectl rollout restart deployment/coredns -n kube-system
+kubectl rollout status deployment/coredns -n kube-system --timeout=60s
+
+AGENT_CA=$(kubectl get secret cluster-agent-tls \
+  -n openchoreo-observability-plane -o jsonpath='{.data.ca\.crt}' | base64 -d)
+
+kubectl apply -f - <<EOF
+apiVersion: openchoreo.dev/v1alpha1
+kind: ClusterObservabilityPlane
+metadata:
+  name: default
+spec:
+  planeID: default
+  clusterAgent:
+    clientCA:
+      value: |
+$(echo "$AGENT_CA" | sed 's/^/        /')
+  observerURL: http://observer.openchoreo.localhost:9080
+EOF
+
+# Link data and workflow planes to observability
+kubectl patch clusterdataplane default --type merge \
+  -p '{"spec":{"observabilityPlaneRef":{"kind":"ClusterObservabilityPlane","name":"default"}}}'
+
+kubectl patch clusterworkflowplane default --type merge \
+  -p '{"spec":{"observabilityPlaneRef":{"kind":"ClusterObservabilityPlane","name":"default"}}}'
+
+# Enable Fluent Bit log collection
+helm upgrade -n openchoreo-observability-plane observability-logs-opensearch \
+  oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+  --version 0.3.8 --reuse-values --set fluent-bit.enabled=true
+```
+
 ## Access URLs
 
 | Service | URL |
@@ -387,6 +570,7 @@ EOF
 | API | `http://api.openchoreo.localhost:8080` |
 | Thunder (IdP admin) | `http://thunder.openchoreo.localhost:8080/develop` |
 | Deployed apps | `http://<route>.openchoreoapis.openchoreo.localhost:19080` |
+| Observer (observability) | `http://observer.openchoreo.localhost:9080` |
 
 **Login:** `admin@openchoreo.dev` / `Admin@123`
 
@@ -402,7 +586,7 @@ Port-forwards die when the terminal closes. Run this in a dedicated terminal aft
 bash ~/openchoreo-aws/start-openchoreo-portforward.sh
 ```
 
-Keep that terminal open. The script auto-restarts both the control-plane (`:8080`) and data-plane (`:19080`) port-forwards if they die.
+Keep that terminal open. The script auto-restarts the control-plane (`:8080`), data-plane (`:19080`), and observability (`:9080`) port-forwards if they die.
 
 ## Colima-specific notes
 

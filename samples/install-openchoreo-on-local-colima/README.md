@@ -10,7 +10,7 @@ A single prompt triggers the complete install: Colima startup, all prerequisites
 
 - Starting Colima with Kubernetes (k3s v1.33.4)
 - Installing all prerequisites: Gateway API CRDs, cert-manager, External Secrets Operator, kgateway, OpenBao
-- Installing the full OpenChoreo stack: control plane, data plane, workflow plane
+- Installing the full OpenChoreo stack: control plane, data plane, workflow plane, observability plane
 - Configuring `openchoreo.localhost` domains — Chrome-native secure context, no `/etc/hosts` needed
 - Patching CoreDNS so in-cluster pods resolve `*.openchoreo.localhost` to the right gateway ClusterIPs
 - Fixing the `NODE_ENV=development` Backstage auth issue automatically
@@ -121,6 +121,16 @@ Creates: default Project, DeploymentPipeline, Environments (dev/staging/prod), C
 3. Applies Argo Workflow templates (checkout-source, buildpacks, dockerfile-builder, publish-image)
 4. Registers `ClusterWorkflowPlane`
 
+### Step 7 — Install observability plane
+1. Creates namespace, copies CA, creates ExternalSecrets for OpenSearch credentials
+2. `openchoreo-observability-plane` Helm chart (v1.0.0-rc.1) on port 9080 (TLS disabled)
+3. Installs modules in parallel: `observability-logs-opensearch`, `observability-metrics-prometheus`, `observability-traces-opensearch`
+4. Reconfigures observer with `observer.openchoreo.localhost` hostname and internal Thunder URLs
+5. Adds `observer.openchoreo.localhost` → obs gateway ClusterIP to CoreDNS
+6. Registers `ClusterObservabilityPlane` with `observerURL: http://observer.openchoreo.localhost:9080`
+7. Links data plane and workflow plane to the observability plane
+8. Enables Fluent Bit log collection
+
 ---
 
 ## Results from the last run
@@ -140,7 +150,8 @@ Creates: default Project, DeploymentPipeline, Environments (dev/staging/prod), C
 | Control plane (Thunder + Backstage + controller) | ~2 minutes |
 | Data plane | ~1 minute |
 | Workflow plane | ~30 seconds |
-| **Total** | **~6 minutes** |
+| Observability plane (core + 3 modules) | ~3 minutes |
+| **Total** | **~9 minutes** |
 
 ### All planes healthy
 
@@ -161,23 +172,35 @@ gateway-default           1/1   Ready
 argo-server                   1/1   Ready
 argo-workflow-controller      1/1   Ready
 cluster-agent-workflowplane   1/1   Ready
+
+=== Observability Plane (openchoreo-observability-plane) ===
+cluster-agent-observabilityplane   1/1   Ready
+controller-manager                 1/1   Ready
+gateway-default                    1/1   Ready
+kube-state-metrics                 1/1   Ready
+metrics-adapter-prometheus         1/1   Ready
+observer                           1/1   Ready
+opentelemetry-collector            1/1   Ready
+prometheus-operator                1/1   Ready
 ```
 
 ### Plane registrations
 
 ```
-clusterdataplane.openchoreo.dev/default    Ready
-clusterworkflowplane.openchoreo.dev/default   Ready
+clusterdataplane.openchoreo.dev/default              Ready
+clusterworkflowplane.openchoreo.dev/default          Ready
+clusterobservabilityplane.openchoreo.dev/default     Ready
 ```
 
 ### CoreDNS configuration (final)
 
 ```
 hosts {
-  10.43.34.57  openchoreo.localhost
-  10.43.34.57  api.openchoreo.localhost
-  10.43.34.57  thunder.openchoreo.localhost
-  10.43.154.89 openchoreoapis.openchoreo.localhost
+  10.43.34.57   openchoreo.localhost
+  10.43.34.57   api.openchoreo.localhost
+  10.43.34.57   thunder.openchoreo.localhost
+  10.43.154.89  openchoreoapis.openchoreo.localhost
+  10.43.234.220 observer.openchoreo.localhost
   fallthrough
 }
 ```
@@ -193,6 +216,7 @@ hosts {
 | API | `http://api.openchoreo.localhost:8080` |
 | Thunder (IdP admin) | `http://thunder.openchoreo.localhost:8080/develop` |
 | Deployed apps | `http://<route>.openchoreoapis.openchoreo.localhost:19080` |
+| Observer (observability) | `http://observer.openchoreo.localhost:9080` |
 
 **Login:** `admin@openchoreo.dev` / `Admin@123`
 **Thunder admin:** `admin` / `admin`
@@ -207,7 +231,7 @@ Chrome resolves `*.localhost` to `127.0.0.1` natively (no `/etc/hosts` needed). 
 bash ~/openchoreo-aws/start-openchoreo-portforward.sh
 ```
 
-The script auto-restarts both port-forwards if they die.
+The script auto-restarts all three port-forwards (`:8080`, `:19080`, `:9080`) if they die.
 
 ---
 
