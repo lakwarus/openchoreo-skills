@@ -1,7 +1,7 @@
 # OpenChoreo Skills
 
-> **Supported OpenChoreo version: 0.17**
-> The skills, reference files, and MCP tool mappings in this repository are verified against OpenChoreo **v0.17**. Behaviour may differ on earlier or later versions.
+> **Supported OpenChoreo version: v1.0.0-rc.1**
+> The skills, reference files, and MCP tool mappings in this repository are verified against OpenChoreo **v1.0.0-rc.1**. Behaviour may differ on earlier or later versions.
 
 This repository contains **OpenChoreo Skills** — structured guides and reference documentation that AI agents (such as Claude Code) and automation tools use to operate on the OpenChoreo internal developer platform.
 
@@ -18,6 +18,23 @@ https://github.com/isala404/openchoreo/tree/occ-skill/docs/skills
 This repository builds on that work and extends it with additional reference documentation, MCP tool guides, and platform engineer coverage.
 
 Special thanks to Isala for creating the initial developer skills foundation.
+
+---
+
+## Quick start — install OpenChoreo on local Colima
+
+Want to get OpenChoreo running on your Mac in one prompt? See the [local Colima install sample](samples/install-openchoreo-on-local-colima/README.md):
+
+1. Install prerequisites: `brew install colima kubectl helm`
+2. Add this skill repo to Claude Code: `claude skills add https://github.com/lakwarus/openchoreo-skills -g`
+3. Run Claude Code and paste:
+   ```
+   Based on the openchoreo-install skill, set up OpenChoreo fully on my local
+   Colima cluster from scratch. Use the local-colima.md reference guide.
+   Install everything: control plane, data plane, and workflow plane.
+   ```
+
+Claude Code handles the rest — ~6 minutes to a fully running cluster.
 
 ---
 
@@ -130,6 +147,7 @@ The `samples/` directory contains end-to-end examples showing how to use these s
 
 | Sample | What it demonstrates |
 |--------|---------------------|
+| [`samples/install-openchoreo-on-local-colima/`](samples/install-openchoreo-on-local-colima/README.md) | Fully automated OpenChoreo install on local macOS Colima from a single prompt — all planes, `openchoreo.localhost` domains, CoreDNS, ~6 minutes end-to-end |
 | [`samples/google-microservice-demo/`](samples/google-microservice-demo/README.md) | Deploy the 12-service GCP Online Boutique onto OpenChoreo using a single prompt — BYOI, gRPC services, connections, external HTTP, worker type |
 
 Each sample includes the exact prompt used, a step-by-step account of what the AI did, results, and any issues discovered.
@@ -139,6 +157,18 @@ Each sample includes the exact prompt used, a step-by-step account of what the A
 ## Repository structure
 
 ```
+openchoreo-install/
+  SKILL.md                  # Install skill guide — loaded by AI agent
+  references/
+    local-colima.md         # Colima/k3s install path (openchoreo.localhost)
+    local-k3d.md            # k3d install path
+    prerequisites.md        # Tool versions, CRDs, cert-manager, kgateway, OpenBao
+    control-plane.md        # TLS, Helm install, Thunder, domain config
+    data-plane.md           # Data plane install and ClusterDataPlane registration
+    workflow-plane.md       # Workflow plane install and ClusterWorkflowPlane
+    observability-plane.md  # Observability plane install
+    cleanup.md              # Full uninstall sequence
+
 openchoreo-developer/
   SKILL.md                  # Developer skill guide — loaded by AI agent
   references/
@@ -164,9 +194,9 @@ openchoreo-platform-engineer/
     advanced-setup.md
     repo-and-context7.md
 
-refresh-openchoreo-mcp.sh   # Legacy script (see official MCP config guide)
-
 samples/
+  install-openchoreo-on-local-colima/
+    README.md               # Prerequisites, skill setup, prompt, step-by-step run, results
   google-microservice-demo/
     README.md               # Prompt, mapping plan, results, known issues
 ```
