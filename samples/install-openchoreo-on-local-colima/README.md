@@ -228,7 +228,14 @@ hosts {
 Chrome resolves `*.localhost` to `127.0.0.1` natively (no `/etc/hosts` needed). However, kubectl port-forwards are needed to route traffic from `localhost:8080` into the Colima VM. Run this in a dedicated terminal each time you restart Colima:
 
 ```bash
-bash ~/openchoreo-aws/start-openchoreo-portforward.sh
+curl -fsSL https://raw.githubusercontent.com/lakwarus/openchoreo-skills/main/openchoreo-install/start-openchoreo-portforward.sh | bash
+```
+
+Or download once and run locally:
+```bash
+curl -fsSL https://raw.githubusercontent.com/lakwarus/openchoreo-skills/main/openchoreo-install/start-openchoreo-portforward.sh \
+  -o start-openchoreo-portforward.sh
+bash start-openchoreo-portforward.sh
 ```
 
 The script auto-restarts all three port-forwards (`:8080`, `:19080`, `:9080`) if they die.

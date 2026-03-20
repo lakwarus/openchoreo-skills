@@ -583,7 +583,14 @@ Chrome resolves `*.localhost` to `127.0.0.1` natively — no `/etc/hosts` entrie
 Port-forwards die when the terminal closes. Run this in a dedicated terminal after `colima start`:
 
 ```bash
-bash ~/openchoreo-aws/start-openchoreo-portforward.sh
+curl -fsSL https://raw.githubusercontent.com/lakwarus/openchoreo-skills/main/openchoreo-install/start-openchoreo-portforward.sh | bash
+```
+
+Or download once and run locally:
+```bash
+curl -fsSL https://raw.githubusercontent.com/lakwarus/openchoreo-skills/main/openchoreo-install/start-openchoreo-portforward.sh \
+  -o start-openchoreo-portforward.sh
+bash start-openchoreo-portforward.sh
 ```
 
 Keep that terminal open. The script auto-restarts the control-plane (`:8080`), data-plane (`:19080`), and observability (`:9080`) port-forwards if they die.
