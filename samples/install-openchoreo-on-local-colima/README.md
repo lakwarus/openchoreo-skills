@@ -62,10 +62,10 @@ claude
 Then paste this prompt:
 
 ```
-I deleted my Colima cluster. Based on the openchoreo-install skill, set up
-OpenChoreo fully on my local Colima cluster from scratch. Use the
-local-colima.md reference guide. Install everything: control plane, data plane,
-and workflow plane.
+I want to try OpenChoreo on my local machine. I have Colima, kubectl, and Helm
+installed. Please set up a fresh OpenChoreo environment on my local Colima
+cluster using the openchoreo-install skill. Follow the local-colima.md guide
+and install everything: control plane, data plane, and workflow plane.
 ```
 
 That's it. Claude Code will execute the full installation autonomously.

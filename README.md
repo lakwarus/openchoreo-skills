@@ -29,9 +29,11 @@ Want to get OpenChoreo running on your Mac in one prompt? See the [local Colima 
 2. Add this skill repo to Claude Code: `claude skills add https://github.com/lakwarus/openchoreo-skills -g`
 3. Run Claude Code and paste:
    ```
-   Based on the openchoreo-install skill, set up OpenChoreo fully on my local
-   Colima cluster from scratch. Use the local-colima.md reference guide.
-   Install everything: control plane, data plane, and workflow plane.
+   I want to try OpenChoreo on my local machine. I have Colima, kubectl, and
+   Helm installed. Please set up a fresh OpenChoreo environment on my local
+   Colima cluster using the openchoreo-install skill. Follow the
+   local-colima.md guide and install everything: control plane, data plane,
+   and workflow plane.
    ```
 
 Claude Code handles the rest — ~6 minutes to a fully running cluster.
