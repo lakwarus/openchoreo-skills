@@ -4,7 +4,7 @@ Use this path when your only local tool is Colima. No k3d required — OpenChore
 
 > **Recommended for:** macOS users with Colima already installed.
 >
-> **Browser access note:** The Colima VM IP (`192.168.64.x`) works from curl and Safari/Firefox. Chrome may report `ERR_ADDRESS_UNREACHABLE`. For guaranteed Chrome access, use the [k3d path](local-k3d.md) instead.
+> **Browser access:** Uses `openchoreo.localhost` domains. Chrome resolves `*.localhost` to `127.0.0.1` natively (secure context — no flags needed, no `/etc/hosts` needed). A port-forward script tunnels traffic from `localhost:8080` into the cluster.
 
 ## Prerequisites
 
@@ -37,15 +37,10 @@ colima start \
 
 > `--network-address` is required — it assigns a routable IP to the VM (e.g. `192.168.64.3`). Without it, LoadBalancer services get no external IP.
 
-Activate the context and get the VM IP:
+Activate the context:
 ```bash
 kubectl config use-context colima
 kubectl get nodes
-
-export COLIMA_IP=$(kubectl get node \
-  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-export DOMAIN="openchoreo.${COLIMA_IP//./-}.nip.io"
-echo "Domain: $DOMAIN   IP: $COLIMA_IP"
 ```
 
 ## Step 2 — Install prerequisites
@@ -120,7 +115,7 @@ echo Done
 
 Create ClusterSecretStore using **token auth** (simpler than kubernetes auth for local dev):
 ```bash
-kubectl apply -f - <<EOF
+kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Secret
 metadata:
@@ -156,19 +151,17 @@ EOF
 kubectl wait --for=condition=Ready clustersecretstore/default --timeout=30s
 ```
 
-> **Why token auth?** Kubernetes auth in OpenBao requires the token reviewer JWT to match the cluster's API server CA. On a fresh k3s cluster, the kubernetes auth method often fails with `403 permission denied` until the auth config is updated with the correct `kubernetes_ca_cert`. Token auth with the dev root token avoids this entirely for local development.
+> **Why token auth?** Kubernetes auth in OpenBao requires the token reviewer JWT to match the cluster's API server CA. Token auth with the dev root token is reliable for local development.
 
 ## Step 3 — Install control plane
 
-The install uses the official k3d single-cluster values files with `openchoreo.localhost` replaced by your nip.io domain. This preserves all Thunder bootstrap scripts (OAuth clients, users, redirect URIs) exactly.
+Uses the official k3d single-cluster values files directly — they already use `openchoreo.localhost` as the domain. No domain substitution needed.
 
 ```bash
 # Install Thunder (identity provider)
-curl -fsSL https://raw.githubusercontent.com/openchoreo/openchoreo/refs/tags/v1.0.0-rc.1/install/k3d/common/values-thunder.yaml | \
-  sed "s/openchoreo\.localhost/${DOMAIN}/g" | \
-  helm upgrade --install thunder oci://ghcr.io/asgardeo/helm-charts/thunder \
-    --namespace thunder --create-namespace --version 0.26.0 \
-    --values -
+helm upgrade --install thunder oci://ghcr.io/asgardeo/helm-charts/thunder \
+  --namespace thunder --create-namespace --version 0.26.0 \
+  --values https://raw.githubusercontent.com/openchoreo/openchoreo/refs/tags/v1.0.0-rc.1/install/k3d/common/values-thunder.yaml
 
 kubectl wait -n thunder --for=condition=available --timeout=300s deployment -l app.kubernetes.io/name=thunder
 
@@ -207,27 +200,61 @@ kubectl wait -n openchoreo-control-plane \
   --for=condition=Ready externalsecret/backstage-secrets --timeout=60s
 
 # Control plane
-curl -fsSL https://raw.githubusercontent.com/openchoreo/openchoreo/main/install/k3d/single-cluster/values-cp.yaml | \
-  sed "s/openchoreo\.localhost/${DOMAIN}/g" | \
-  helm upgrade --install openchoreo-control-plane oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane \
-    --version 1.0.0-rc.1 \
-    --namespace openchoreo-control-plane \
-    --create-namespace \
-    --timeout 15m \
-    --values -
+helm upgrade --install openchoreo-control-plane oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane \
+  --version 1.0.0-rc.1 \
+  --namespace openchoreo-control-plane \
+  --create-namespace \
+  --timeout 15m \
+  --values https://raw.githubusercontent.com/openchoreo/openchoreo/main/install/k3d/single-cluster/values-cp.yaml
 
 kubectl wait -n openchoreo-control-plane --for=condition=available --timeout=300s deployment --all
 ```
 
-Verify console:
+### Fix Backstage auth environment
+
+The Backstage app-config has auth under the `development:` key, but the chart sets `NODE_ENV=production`. Patch it to `development` so the auth provider loads:
+
 ```bash
-curl -s "http://${DOMAIN}:8080" | head -1
-# Should return <!DOCTYPE html>
+kubectl patch deployment backstage -n openchoreo-control-plane \
+  --field-manager helm \
+  --type=json \
+  -p '[{"op":"replace","path":"/spec/template/spec/containers/0/env/0/value","value":"development"}]'
+
+kubectl rollout status deployment/backstage -n openchoreo-control-plane --timeout=120s
 ```
 
-Console URL: **`http://${DOMAIN}:8080`** — `admin@openchoreo.dev` / `Admin@123`
+> **Note:** This patch survives pod restarts but will be reset on the next `helm upgrade`. Re-apply after any control plane upgrade.
 
-Thunder admin: **`http://thunder.${DOMAIN}:8080/develop`** — `admin` / `admin`
+### Configure CoreDNS for in-cluster resolution
+
+Pods inside the cluster cannot resolve `*.openchoreo.localhost` via the upstream DNS — it needs to point to the gateway ClusterIP. Get the ClusterIP and patch CoreDNS:
+
+```bash
+CP_GW_IP=$(kubectl get svc gateway-default -n openchoreo-control-plane \
+  -o jsonpath='{.spec.clusterIP}')
+echo "CP gateway ClusterIP: $CP_GW_IP"
+
+kubectl patch configmap coredns -n kube-system --type merge -p "{
+  \"data\": {
+    \"Corefile\": \".:53 {\n    errors\n    health\n    ready\n    kubernetes cluster.local in-addr.arpa ip6.arpa {\n      pods insecure\n      fallthrough in-addr.arpa ip6.arpa\n    }\n    hosts {\n      ${CP_GW_IP} openchoreo.localhost\n      ${CP_GW_IP} api.openchoreo.localhost\n      ${CP_GW_IP} thunder.openchoreo.localhost\n      fallthrough\n    }\n    prometheus :9153\n    forward . /etc/resolv.conf\n    cache 30\n    loop\n    reload\n    loadbalance\n}\n\"
+  }
+}"
+
+kubectl rollout restart deployment/coredns -n kube-system
+kubectl rollout status deployment/coredns -n kube-system --timeout=60s
+```
+
+> **Why CoreDNS and not /etc/hosts?** `/etc/hosts` on macOS only affects the host machine. Pods inside the cluster have their own DNS via CoreDNS. Without this override, in-cluster HTTP calls (Backstage → Thunder token endpoint, API server → Thunder JWKS) fail because `*.openchoreo.localhost` would fall through to Colima's internal DNS (192.168.5.1) which returns `127.0.0.1` — correct for the host but wrong for pods (loopback inside the pod, not the gateway).
+
+Verify console:
+```bash
+curl -s "http://openchoreo.localhost:8080" | head -1
+# Requires the port-forward to be running (see "Every session" below)
+```
+
+Console URL: **`http://openchoreo.localhost:8080`** — `admin@openchoreo.dev` / `Admin@123`
+
+Thunder admin: **`http://thunder.openchoreo.localhost:8080/develop`** — `admin` / `admin`
 
 ## Step 4 — Apply default resources
 
@@ -248,15 +275,13 @@ kubectl get secret cluster-gateway-ca -n openchoreo-control-plane \
     -n openchoreo-data-plane \
     --dry-run=client -o yaml | kubectl apply -f -
 
-# k3d values-dp.yaml uses httpPort:19080 — works without port offset conflicts on single-node k3s
-curl -fsSL https://raw.githubusercontent.com/openchoreo/openchoreo/main/install/k3d/single-cluster/values-dp.yaml | \
-  sed "s/openchoreo\.localhost/${DOMAIN}/g" | \
-  helm upgrade --install openchoreo-data-plane oci://ghcr.io/openchoreo/helm-charts/openchoreo-data-plane \
-    --version 1.0.0-rc.1 \
-    --namespace openchoreo-data-plane \
-    --create-namespace \
-    --timeout 15m \
-    --values -
+# k3d values-dp.yaml uses httpPort:19080 — no port conflict with CP gateway on single-node k3s
+helm upgrade --install openchoreo-data-plane oci://ghcr.io/openchoreo/helm-charts/openchoreo-data-plane \
+  --version 1.0.0-rc.1 \
+  --namespace openchoreo-data-plane \
+  --create-namespace \
+  --timeout 15m \
+  --values https://raw.githubusercontent.com/openchoreo/openchoreo/main/install/k3d/single-cluster/values-dp.yaml
 
 kubectl wait -n openchoreo-data-plane --for=condition=available --timeout=300s deployment --all
 
@@ -280,12 +305,32 @@ $(echo "$AGENT_CA" | sed 's/^/        /')
     ingress:
       external:
         http:
-          host: "openchoreoapis.${COLIMA_IP//./-}.nip.io"
+          host: "openchoreoapis.openchoreo.localhost"
           listenerName: http
           port: 19080
         name: gateway-default
         namespace: openchoreo-data-plane
 EOF
+```
+
+Add the data plane gateway to CoreDNS:
+
+```bash
+DP_GW_IP=$(kubectl get svc gateway-default -n openchoreo-data-plane \
+  -o jsonpath='{.spec.clusterIP}')
+echo "DP gateway ClusterIP: $DP_GW_IP"
+
+CP_GW_IP=$(kubectl get svc gateway-default -n openchoreo-control-plane \
+  -o jsonpath='{.spec.clusterIP}')
+
+kubectl patch configmap coredns -n kube-system --type merge -p "{
+  \"data\": {
+    \"Corefile\": \".:53 {\n    errors\n    health\n    ready\n    kubernetes cluster.local in-addr.arpa ip6.arpa {\n      pods insecure\n      fallthrough in-addr.arpa ip6.arpa\n    }\n    hosts {\n      ${CP_GW_IP} openchoreo.localhost\n      ${CP_GW_IP} api.openchoreo.localhost\n      ${CP_GW_IP} thunder.openchoreo.localhost\n      ${DP_GW_IP} openchoreoapis.openchoreo.localhost\n      fallthrough\n    }\n    prometheus :9153\n    forward . /etc/resolv.conf\n    cache 30\n    loop\n    reload\n    loadbalance\n}\n\"
+  }
+}"
+
+kubectl rollout restart deployment/coredns -n kube-system
+kubectl rollout status deployment/coredns -n kube-system --timeout=60s
 ```
 
 ## Step 6 — Install workflow plane (optional)
@@ -334,44 +379,40 @@ $(echo "$AGENT_CA" | sed 's/^/        /')
 EOF
 ```
 
-Argo Workflows UI: `http://${COLIMA_IP}:10081`
-
 ## Access URLs
-
-Replace `192-168-64-3` with your actual IP (dashes, not dots).
 
 | Service | URL |
 |---|---|
-| Console | `http://openchoreo.192-168-64-3.nip.io:8080` |
-| API | `http://api.openchoreo.192-168-64-3.nip.io:8080` |
-| Thunder (IdP admin) | `http://thunder.openchoreo.192-168-64-3.nip.io:8080/develop` |
-| Deployed apps | `http://openchoreoapis.192-168-64-3.nip.io:19080` |
-| Argo Workflows UI | `http://192.168.64.3:10081` |
+| Console | `http://openchoreo.localhost:8080` |
+| API | `http://api.openchoreo.localhost:8080` |
+| Thunder (IdP admin) | `http://thunder.openchoreo.localhost:8080/develop` |
+| Deployed apps | `http://<route>.openchoreoapis.openchoreo.localhost:19080` |
 
 **Login:** `admin@openchoreo.dev` / `Admin@123`
 
-## Browser access (Chrome workaround)
+## Browser access
 
-If Chrome shows `ERR_ADDRESS_UNREACHABLE`, run a port-forward and add a hosts entry:
+Chrome resolves `*.localhost` to `127.0.0.1` natively — no `/etc/hosts` entries and no Chrome flags needed. The `openchoreo.localhost` domains are also treated as **secure contexts** by Chrome, so `window.crypto.randomUUID` and other Web Crypto APIs work without HTTPS.
+
+### Every session — start the port-forward
+
+Port-forwards die when the terminal closes. Run this in a dedicated terminal after `colima start`:
 
 ```bash
-# Forward console gateway to localhost
-kubectl port-forward -n openchoreo-control-plane svc/gateway-default 8080:8080 &
-
-# Add to /etc/hosts (one-time, requires sudo):
-echo "127.0.0.1 openchoreo.192-168-64-3.nip.io api.openchoreo.192-168-64-3.nip.io thunder.openchoreo.192-168-64-3.nip.io" | sudo tee -a /etc/hosts
+bash ~/openchoreo-aws/start-openchoreo-portforward.sh
 ```
 
-Then access `http://openchoreo.192-168-64-3.nip.io:8080` — Chrome will route through the local port-forward.
+Keep that terminal open. The script auto-restarts both the control-plane (`:8080`) and data-plane (`:19080`) port-forwards if they die.
 
 ## Colima-specific notes
 
-- **`--network-address` is required** — without it, LoadBalancer services show no external IP.
+- **`--network-address` is required** — without it, LoadBalancer services get no external IP.
 - **`colima start` without flags resumes an existing VM** with its saved config. If the VM was recreated (disk reset), resource settings may default to 2 CPU / 2GB; always use explicit flags when unsure.
 - **After restart, run `kubectl config use-context colima`** — if you have other clusters, the context may not switch automatically.
-- **ClusterSecretStore uses token auth** (not kubernetes auth) — kubernetes auth requires extra CA cert configuration in k3s that varies per cluster; root token auth is reliable for local dev.
-- **Domain substitution via `sed`** — all installs use the official k3d values files with `openchoreo.localhost` substituted by the nip.io domain. This preserves Thunder's bootstrap OAuth client registrations exactly.
-- **Stopping and restarting** — `colima stop` / `colima start` preserves all Kubernetes state.
+- **ClusterSecretStore uses token auth** (not kubernetes auth) — token auth with the dev root token is reliable for local dev.
+- **CoreDNS override persists across restarts** — `colima stop` / `colima start` preserves all Kubernetes state including CoreDNS overrides. Re-apply only if you recreate the VM.
+- **`NODE_ENV=development` patch** — required after any `helm upgrade` of the control plane (the chart resets it to `production`). The patch command is in Step 3.
+- **k3d values files used directly** — the official `install/k3d/single-cluster/` values files already use `openchoreo.localhost` as the domain. No `sed` substitution needed on Colima.
 
 ## Cleanup
 
