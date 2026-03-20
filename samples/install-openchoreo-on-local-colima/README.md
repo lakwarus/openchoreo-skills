@@ -2,7 +2,7 @@
 
 This sample shows how to use Claude Code with the `openchoreo-install` skill to perform a **fully automated, hands-off installation** of OpenChoreo on a local macOS machine using Colima's built-in k3s cluster.
 
-A single prompt triggers the complete install: Colima startup, all prerequisites, control plane, data plane, and workflow plane.
+A single prompt triggers the complete install: Colima startup, all prerequisites, control plane, data plane, workflow plane, and observability plane.
 
 ---
 
