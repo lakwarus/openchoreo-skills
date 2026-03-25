@@ -401,7 +401,7 @@ Fall back to `kubectl` only if the REST API does not expose the resource.
 
 **`get_cluster_component_type_schema` vs `get_component_type_schema`**: Cluster-scoped types (`ClusterComponentType`) are the most common. Namespace-scoped types (`ComponentType`) are for tenant isolation. Use the cluster-scoped tools first.
 
-**Two separate MCP servers**: `mcp__openchoreo-cp__*` targets the control plane API; `mcp__openchoreo-obs__*` targets the Observer API. Both require separate registration. See the [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/).
+**Two separate MCP servers**: `mcp__openchoreo-cp__*` targets the control plane API; `mcp__openchoreo-obs__*` targets the Observer API. Both require separate registration.
 
 **No observability data after plane registration**: Inspect the ObservabilityPlane with `kubectl describe`. Missing data usually means the agent CA cert is wrong or `observerURL` is unreachable.
 
